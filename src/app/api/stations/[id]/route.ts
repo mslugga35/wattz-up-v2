@@ -4,10 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db/client';
-import { stations } from '@/lib/db/schema';
+import { supabase } from '@/lib/db/client';
 import { estimateWaitTime } from '@/lib/services/estimator';
-import { eq, isNull } from 'drizzle-orm';
 
 export async function GET(
   request: NextRequest,
@@ -17,23 +15,14 @@ export async function GET(
     const { id } = await params;
 
     // Fetch station
-    const result = await db
-      .select()
-      .from(stations)
-      .where(eq(stations.id, id))
-      .limit(1);
+    const { data: station, error } = await supabase
+      .from('stations')
+      .select('*')
+      .eq('id', id)
+      .is('deleted_at', null)
+      .single();
 
-    if (result.length === 0) {
-      return NextResponse.json(
-        { error: 'Station not found' },
-        { status: 404 }
-      );
-    }
-
-    const station = result[0];
-
-    // Check if deleted
-    if (station.deletedAt) {
+    if (error || !station) {
       return NextResponse.json(
         { error: 'Station not found' },
         { status: 404 }
@@ -46,7 +35,7 @@ export async function GET(
     return NextResponse.json({
       station: {
         id: station.id,
-        externalId: station.externalId,
+        externalId: station.external_id,
         source: station.source,
         name: station.name,
         latitude: Number(station.latitude),
@@ -57,16 +46,16 @@ export async function GET(
         state: station.state,
         zip: station.zip,
         network: station.network,
-        plugTypes: station.plugTypes || [],
-        stallsTotal: station.stallsTotal || 4,
-        maxPowerKw: station.maxPowerKw,
-        pricingPerKwh: station.pricingPerKwh ? Number(station.pricingPerKwh) : undefined,
-        pricingPerMinute: station.pricingPerMinute ? Number(station.pricingPerMinute) : undefined,
+        plugTypes: station.plug_types || [],
+        stallsTotal: station.stalls_total || 4,
+        maxPowerKw: station.max_power_kw,
+        pricingPerKwh: station.pricing_per_kwh ? Number(station.pricing_per_kwh) : undefined,
+        pricingPerMinute: station.pricing_per_minute ? Number(station.pricing_per_minute) : undefined,
         amenities: station.amenities || [],
-        accessRestrictions: station.accessRestrictions,
-        dataQualityScore: Number(station.dataQualityScore) || 0.5,
-        createdAt: station.createdAt,
-        updatedAt: station.updatedAt,
+        accessRestrictions: station.access_restrictions,
+        dataQualityScore: Number(station.data_quality_score) || 0.5,
+        createdAt: station.created_at,
+        updatedAt: station.updated_at,
       },
       estimate,
     });

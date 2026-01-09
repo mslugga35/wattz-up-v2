@@ -8,9 +8,7 @@
  * - Industry defaults if no data available
  */
 
-import { db, rawQuery } from '@/lib/db/client';
-import { observations, sessionStatsHourly, stations } from '@/lib/db/schema';
-import { eq, desc, gte, and } from 'drizzle-orm';
+import { supabase } from '@/lib/db/client';
 import {
   Estimate,
   EstimationMode,
@@ -28,13 +26,22 @@ interface SessionStatsRecord {
   p75_session_min: number;
   avg_queue_length: number;
   sample_count: number;
-  last_computed_at: Date;
+  last_computed_at: string;
 }
 
 interface StationMeta {
   id: string;
   stallsTotal: number;
   maxPowerKw: number | null;
+}
+
+interface ObservationRecord {
+  id: string;
+  station_id: string;
+  observation_type: string;
+  queue_position: number | null;
+  session_duration_min: number | null;
+  observed_at: string;
 }
 
 // ============ HELPERS ============
@@ -75,22 +82,18 @@ function calculateConfidence(
 // ============ DATA FETCHERS ============
 
 async function getStationMetadata(stationId: string): Promise<StationMeta | null> {
-  const result = await db
-    .select({
-      id: stations.id,
-      stallsTotal: stations.stallsTotal,
-      maxPowerKw: stations.maxPowerKw,
-    })
-    .from(stations)
-    .where(eq(stations.id, stationId))
-    .limit(1);
+  const { data, error } = await supabase
+    .from('stations')
+    .select('id, stalls_total, max_power_kw')
+    .eq('id', stationId)
+    .single();
 
-  if (result.length === 0) return null;
+  if (error || !data) return null;
 
   return {
-    id: result[0].id,
-    stallsTotal: result[0].stallsTotal ?? 4,
-    maxPowerKw: result[0].maxPowerKw,
+    id: data.id,
+    stallsTotal: data.stalls_total ?? 4,
+    maxPowerKw: data.max_power_kw,
   };
 }
 
@@ -99,47 +102,42 @@ async function getSessionStats(stationId: string): Promise<SessionStatsRecord | 
   const dayOfWeek = now.getDay();
   const hourOfDay = now.getHours();
 
-  const result = await db
-    .select()
-    .from(sessionStatsHourly)
-    .where(
-      and(
-        eq(sessionStatsHourly.stationId, stationId),
-        eq(sessionStatsHourly.dayOfWeek, dayOfWeek),
-        eq(sessionStatsHourly.hourOfDay, hourOfDay)
-      )
-    )
-    .limit(1);
+  const { data, error } = await supabase
+    .from('session_stats_hourly')
+    .select('*')
+    .eq('station_id', stationId)
+    .eq('day_of_week', dayOfWeek)
+    .eq('hour_of_day', hourOfDay)
+    .single();
 
-  if (result.length === 0) return null;
+  if (error || !data) return null;
 
-  const row = result[0];
   return {
-    station_id: row.stationId,
-    day_of_week: row.dayOfWeek,
-    hour_of_day: row.hourOfDay,
-    median_session_min: Number(row.medianSessionMin) || 0,
-    p75_session_min: Number(row.p75SessionMin) || 0,
-    avg_queue_length: Number(row.avgQueueLength) || 0,
-    sample_count: row.sampleCount ?? 0,
-    last_computed_at: row.lastComputedAt ?? new Date(),
+    station_id: data.station_id,
+    day_of_week: data.day_of_week,
+    hour_of_day: data.hour_of_day,
+    median_session_min: Number(data.median_session_min) || 0,
+    p75_session_min: Number(data.p75_session_min) || 0,
+    avg_queue_length: Number(data.avg_queue_length) || 0,
+    sample_count: data.sample_count ?? 0,
+    last_computed_at: data.last_computed_at ?? new Date().toISOString(),
   };
 }
 
-async function getRecentObservations(stationId: string, hoursBack: number = 2) {
-  const cutoff = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
+async function getRecentObservations(stationId: string, hoursBack: number = 2): Promise<ObservationRecord[]> {
+  const cutoff = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
 
-  return db
-    .select()
-    .from(observations)
-    .where(
-      and(
-        eq(observations.stationId, stationId),
-        gte(observations.observedAt, cutoff)
-      )
-    )
-    .orderBy(desc(observations.observedAt))
+  const { data, error } = await supabase
+    .from('observations')
+    .select('id, station_id, observation_type, queue_position, session_duration_min, observed_at')
+    .eq('station_id', stationId)
+    .gte('observed_at', cutoff)
+    .order('observed_at', { ascending: false })
     .limit(50);
+
+  if (error || !data) return [];
+
+  return data as ObservationRecord[];
 }
 
 // ============ MAIN ESTIMATOR ============
@@ -172,15 +170,15 @@ export async function estimateWaitTime(stationId: string): Promise<Estimate> {
       sources.push('crowd_recent');
 
       const queueObs = recentObs.filter(
-        (obs) => obs.observationType === 'in_queue' && obs.queuePosition
+        (obs) => obs.observation_type === 'in_queue' && obs.queue_position
       );
       const sessionObs = recentObs.filter(
-        (obs) => obs.observationType === 'done_charging' && obs.sessionDurationMin
+        (obs) => obs.observation_type === 'done_charging' && obs.session_duration_min
       );
 
       if (queueObs.length > 0) {
         const avgQueuePosition = queueObs.reduce(
-          (sum, obs) => sum + (obs.queuePosition || 0),
+          (sum, obs) => sum + (obs.queue_position || 0),
           0
         ) / queueObs.length;
 
@@ -189,14 +187,14 @@ export async function estimateWaitTime(stationId: string): Promise<Estimate> {
         crowdEstimate = (avgQueuePosition * sessionTime) / stallsFactor;
       } else if (sessionObs.length > 0) {
         const avgSessionDuration = sessionObs.reduce(
-          (sum, obs) => sum + (obs.sessionDurationMin || 0),
+          (sum, obs) => sum + (obs.session_duration_min || 0),
           0
         ) / sessionObs.length;
         crowdEstimate = avgSessionDuration * 0.5;
       }
 
       const mostRecentObs = recentObs[0];
-      const ageMillis = Date.now() - new Date(mostRecentObs.observedAt!).getTime();
+      const ageMillis = Date.now() - new Date(mostRecentObs.observed_at).getTime();
       freshnessMinutes = Math.floor(ageMillis / 60000);
     }
 
@@ -206,7 +204,7 @@ export async function estimateWaitTime(stationId: string): Promise<Estimate> {
       sources.push('historical');
       historicalEstimate = sessionStats.median_session_min;
 
-      const statsAgeMillis = Date.now() - sessionStats.last_computed_at.getTime();
+      const statsAgeMillis = Date.now() - new Date(sessionStats.last_computed_at).getTime();
       const statsAgeMinutes = Math.floor(statsAgeMillis / 60000);
       if (statsAgeMinutes < freshnessMinutes) {
         freshnessMinutes = statsAgeMinutes;
