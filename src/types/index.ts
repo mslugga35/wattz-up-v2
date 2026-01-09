@@ -18,6 +18,10 @@ export const ObservationType = {
   in_queue: 'in_queue',
   plugged_in: 'plugged_in',
   done_charging: 'done_charging',
+  available: 'available',
+  short_wait: 'short_wait',
+  long_wait: 'long_wait',
+  full: 'full',
 } as const;
 
 export type ObservationType = typeof ObservationType[keyof typeof ObservationType];

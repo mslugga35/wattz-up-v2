@@ -17,7 +17,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Clock, Users, Zap, CheckCircle } from 'lucide-react';
-import { StationWithEstimate } from '@/types';
+import { StationWithEstimate, ObservationType } from '@/types';
 import { submitObservation } from '@/lib/api';
 import { useAppStore } from '@/store/app';
 import { toast } from 'sonner';
@@ -30,12 +30,12 @@ interface ReportDialogProps {
 export function ReportDialog({ station, trigger }: ReportDialogProps) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<ObservationType | null>(null);
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
   const [stallsAvailable, setStallsAvailable] = useState<number | null>(null);
   const { deviceId } = useAppStore();
 
-  const observationTypes = [
+  const observationTypes: { id: ObservationType; label: string; icon: typeof CheckCircle; color: string }[] = [
     { id: 'available', label: 'Available Now', icon: CheckCircle, color: 'bg-green-500' },
     { id: 'short_wait', label: '< 10 min wait', icon: Clock, color: 'bg-yellow-500' },
     { id: 'long_wait', label: '10+ min wait', icon: Users, color: 'bg-orange-500' },
@@ -95,7 +95,7 @@ export function ReportDialog({ station, trigger }: ReportDialogProps) {
             {observationTypes.map((type) => (
               <button
                 key={type.id}
-                onClick={() => setSelectedType(type.id)}
+                onClick={() => setSelectedType(type.id as ObservationType)}
                 className={`p-3 rounded-lg border-2 transition-all ${
                   selectedType === type.id
                     ? 'border-primary bg-primary/10'
