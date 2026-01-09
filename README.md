@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Wattz Up v2
 
-## Getting Started
+**Real-time wait time estimates for 65,000+ EV charging stations**
 
-First, run the development server:
+A simplified rebuild of the original Wattz Up app. Single Next.js 14 app with PWA support.
+
+## Stack
+
+| Layer | Tech |
+|-------|------|
+| Framework | Next.js 14 (App Router) |
+| Mobile | PWA (installable) |
+| Database | Supabase (PostgreSQL + PostGIS) |
+| ORM | Drizzle |
+| UI | Tailwind + Shadcn/ui |
+| Maps | Mapbox GL |
+| State | Zustand |
+
+## Quick Start
+
+### 1. Install dependencies
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Set up environment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cp .env.example .env.local
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Fill in:
+- `NEXT_PUBLIC_SUPABASE_URL` - From Supabase dashboard
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - From Supabase dashboard
+- `DATABASE_URL` - Supabase connection pooler URL
+- `NEXT_PUBLIC_MAPBOX_TOKEN` - From Mapbox account
+- `AFDC_API_KEY` - From NREL developer portal
 
-## Learn More
+### 3. Set up database
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+# Generate migrations
+pnpm drizzle-kit generate
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Push to database
+pnpm drizzle-kit push
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Important:** Enable PostGIS extension in Supabase:
+```sql
+CREATE EXTENSION IF NOT EXISTS postgis;
+```
 
-## Deploy on Vercel
+### 4. Run development server
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+pnpm dev
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Open [http://localhost:3000](http://localhost:3000)
+
+## vs Original
+
+| Aspect | Original | v2 |
+|--------|----------|-----|
+| Packages | 6 (monorepo) | 1 (single app) |
+| Mobile | React Native | PWA |
+| API | Fastify | Next.js API routes |
+| Workers | Separate services | Vercel Cron |
+| Admin | Separate app | Same app (/admin) |
+| Complexity | 8/10 | 2/10 |
+
+## Deployment
+
+```bash
+vercel deploy
+```
+
+## License
+
+MIT

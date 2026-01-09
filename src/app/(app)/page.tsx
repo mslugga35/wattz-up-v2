@@ -13,7 +13,6 @@ import { StationList } from '@/components/station/StationList';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Toaster } from '@/components/ui/sonner';
 import { Zap, RefreshCw, Search, MapPin } from 'lucide-react';
 
 export default function HomePage() {
@@ -76,8 +75,7 @@ export default function HomePage() {
 
   // Fetch stations when location changes
   const fetchStations = useCallback(async () => {
-    // Use map center for searching (what user is looking at)
-    const location = mapCenter;
+    const location = userLocation || mapCenter;
 
     setIsLoading(true);
     try {
@@ -91,12 +89,14 @@ export default function HomePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [mapCenter, radiusKm, setStations, setIsLoading]);
+  }, [userLocation, mapCenter, radiusKm, setStations, setIsLoading]);
 
-  // Fetch on map center or radius change
+  // Fetch on location change
   useEffect(() => {
-    fetchStations();
-  }, [mapCenter.latitude, mapCenter.longitude, radiusKm]);
+    if (userLocation) {
+      fetchStations();
+    }
+  }, [userLocation, fetchStations]);
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -170,8 +170,6 @@ export default function HomePage() {
           </div>
         </div>
       </div>
-
-      <Toaster />
     </div>
   );
 }
