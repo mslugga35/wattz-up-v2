@@ -134,12 +134,11 @@ export interface NearbyStationsResponse {
 
 export interface SubmitObservationRequest {
   stationId: string;
+  deviceId: string;
   observationType: ObservationType;
-  queuePosition?: number;
-  stallsAvailable?: number;
-  sessionDurationMin?: number;
-  latitude: number;
-  longitude: number;
+  queuePosition?: number | null;
+  stallsAvailable?: number | null;
+  sessionDurationMin?: number | null;
 }
 
 export interface CreateAlertRequest {
