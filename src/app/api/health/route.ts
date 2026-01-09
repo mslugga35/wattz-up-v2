@@ -4,9 +4,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db/client';
-import { stations } from '@/lib/db/schema';
-import { sql } from 'drizzle-orm';
+import { supabase } from '@/lib/db/client';
 
 export async function GET() {
   const checks: Record<string, { status: string; latency?: number; error?: string }> = {};
@@ -14,7 +12,8 @@ export async function GET() {
   // Check database
   const dbStart = Date.now();
   try {
-    const result = await db.select({ count: sql<number>`count(*)` }).from(stations);
+    const { error } = await supabase.from('stations').select('id').limit(1);
+    if (error) throw error;
     checks.database = {
       status: 'healthy',
       latency: Date.now() - dbStart,
