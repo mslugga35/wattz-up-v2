@@ -1,12 +1,13 @@
 /**
  * POST /api/cron/ingest
  * Import stations from AFDC API
- * Protected by CRON_SECRET
+ * Protected by CRON_SECRET with timing-safe comparison
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db/client';
 import { encodeGeohash6 } from '@/lib/utils/geohash';
+import crypto from 'crypto';
 
 const AFDC_API_BASE = 'https://developer.nrel.gov/api/alt-fuel-stations/v1';
 
@@ -27,18 +28,30 @@ interface AFDCStation {
   access_code: string;
 }
 
+// Timing-safe token comparison to prevent timing attacks
+function verifyToken(provided: string, expected: string): boolean {
+  if (provided.length !== expected.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+}
+
 export async function POST(request: NextRequest) {
-  // Verify cron secret
+  // Verify cron secret with timing-safe comparison
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || !authHeader?.startsWith('Bearer ')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const providedToken = authHeader.slice(7); // Remove "Bearer "
+  if (!verifyToken(providedToken, cronSecret)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const apiKey = process.env.AFDC_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: 'AFDC_API_KEY not configured' }, { status: 500 });
+    // Don't expose which config is missing
+    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
   }
 
   // Create ingest job record
@@ -71,7 +84,7 @@ export async function POST(request: NextRequest) {
       url.searchParams.set('state', state);
       url.searchParams.set('limit', '200');
 
-      console.log('Fetching:', state);
+      // Fetch state data (don't log state names in production)
 
       const response = await fetch(url.toString());
 
@@ -191,9 +204,7 @@ export async function POST(request: NextRequest) {
         .eq('id', job.id);
     }
 
-    return NextResponse.json(
-      { error: 'Ingest failed', details: error instanceof Error ? error.message : 'Unknown' },
-      { status: 500 }
-    );
+    // Don't expose internal error details to clients
+    return NextResponse.json({ error: 'Ingest failed' }, { status: 500 });
   }
 }

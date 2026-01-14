@@ -11,17 +11,40 @@ import { supabase } from '@/lib/db/client';
 import { z } from 'zod';
 import crypto from 'crypto';
 
+// Simple in-memory rate limiter (per device, 5 submissions per minute)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 5;
+const RATE_WINDOW_MS = 60 * 1000;
+
+function checkRateLimit(deviceId: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(deviceId);
+
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(deviceId, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return true;
+  }
+
+  if (entry.count >= RATE_LIMIT) {
+    return false;
+  }
+
+  entry.count++;
+  return true;
+}
+
 const submitSchema = z.object({
   stationId: z.string().uuid(),
-  deviceId: z.string(),
+  deviceId: z.string().min(10).max(100), // Validate deviceId format
   observationType: z.enum(['available', 'short_wait', 'long_wait', 'full']),
   queuePosition: z.number().int().min(0).max(50).nullish(),
   stallsAvailable: z.number().int().min(0).max(100).nullish(),
 });
 
-// Simple hash for privacy
+// Hash device ID for privacy (use env-based salt)
 function hashDeviceId(deviceId: string): string {
-  return crypto.createHash('sha256').update(deviceId + 'wattz-salt').digest('hex').slice(0, 16);
+  const salt = process.env.CRON_SECRET || 'default-salt';
+  return crypto.createHash('sha256').update(deviceId + salt).digest('hex').slice(0, 16);
 }
 
 export async function POST(request: NextRequest) {
@@ -37,6 +60,14 @@ export async function POST(request: NextRequest) {
     }
 
     const data = parsed.data;
+
+    // Rate limit check
+    if (!checkRateLimit(data.deviceId)) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait a moment.' },
+        { status: 429 }
+      );
+    }
 
     // Get station for geohash
     const { data: station } = await supabase

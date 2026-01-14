@@ -19,9 +19,10 @@ export async function GET() {
       latency: Date.now() - dbStart,
     };
   } catch (error) {
+    console.error('Health check failed:', error);
     checks.database = {
       status: 'unhealthy',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      // Don't expose internal error details
     };
   }
 
