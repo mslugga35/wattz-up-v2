@@ -1,5 +1,4 @@
 {
-  "installCommand": "npm install --legacy-peer-deps",
   "crons": [
     {
       "path": "/api/cron/ingest",
