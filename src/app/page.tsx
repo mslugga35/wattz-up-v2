@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Toaster } from '@/components/ui/sonner';
-import { Zap, RefreshCw, Search, MapPin, HelpCircle, CheckCircle, Car } from 'lucide-react';
+import { Zap, RefreshCw, Search, MapPin, HelpCircle, CheckCircle, Car, Route } from 'lucide-react';
 import { SpeedFilter, SortOption } from '@/store/app';
 import { EV_VEHICLES } from '@/lib/data/vehicles';
 
@@ -138,6 +138,11 @@ export default function HomePage() {
           <Badge variant="outline" className="hidden sm:flex">
             {stations.length} stations
           </Badge>
+          <Link href="/trip">
+            <Button variant="ghost" size="icon" title="Trip Planner">
+              <Route className="w-4 h-4" />
+            </Button>
+          </Link>
           <Link href="/help">
             <Button variant="ghost" size="icon" title="Help & Support">
               <HelpCircle className="w-4 h-4" />
