@@ -9,6 +9,9 @@ import { supabase } from '@/lib/db/client';
 import { encodeGeohash6 } from '@/lib/utils/geohash';
 import { verifyCronAuth } from '@/lib/auth/verify-cron';
 
+// Vercel Pro allows up to 60s function duration
+export const maxDuration = 60;
+
 const AFDC_API_BASE = 'https://developer.nrel.gov/api/alt-fuel-stations/v1';
 
 interface AFDCStation {
@@ -73,8 +76,8 @@ export async function POST(request: NextRequest) {
     ];
 
     // Support batched ingestion to stay within Vercel function timeout
-    // ?batch=0 → states 0-9, ?batch=1 → 10-19, etc. No param → all states
-    const BATCH_STATES = 10;
+    // ?batch=0 → states 0-2, ?batch=1 → 3-5, etc. No param → all states
+    const BATCH_STATES = 3;
     const { searchParams } = new URL(request.url);
     const batchParam = searchParams.get('batch');
     let states: string[];
