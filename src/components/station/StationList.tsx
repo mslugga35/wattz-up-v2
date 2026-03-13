@@ -39,12 +39,15 @@ export function StationList({ onStationSelect }: StationListProps) {
     onStationSelect?.(station);
   };
 
-  // Get badge color based on wait time
-  const getWaitBadgeColor = (waitMinutes: number | null | undefined) => {
-    if (waitMinutes === null || waitMinutes === undefined) return 'secondary';
-    if (waitMinutes <= 5) return 'default';
-    if (waitMinutes <= 15) return 'secondary';
-    return 'destructive';
+  // Get badge style based on wait time
+  const getWaitBadgeStyle = (waitMinutes: number | null | undefined) => {
+    if (waitMinutes === null || waitMinutes === undefined)
+      return { variant: 'secondary' as const, className: 'text-xs' };
+    if (waitMinutes <= 5)
+      return { variant: 'default' as const, className: 'text-xs bg-emerald-600 text-white hover:bg-emerald-700' };
+    if (waitMinutes <= 15)
+      return { variant: 'default' as const, className: 'text-xs bg-amber-500 text-white hover:bg-amber-600' };
+    return { variant: 'default' as const, className: 'text-xs bg-red-600 text-white hover:bg-red-700' };
   };
 
   if (isLoading) {
@@ -98,7 +101,7 @@ export function StationList({ onStationSelect }: StationListProps) {
 
                 <div className="flex flex-wrap gap-2">
                   {/* Wait time badge */}
-                  <Badge variant={getWaitBadgeColor(waitMinutes)} className="text-xs">
+                  <Badge variant={getWaitBadgeStyle(waitMinutes).variant} className={getWaitBadgeStyle(waitMinutes).className}>
                     <Clock className="w-3 h-3 mr-1" />
                     {waitMinutes !== null && waitMinutes !== undefined
                       ? `${waitMinutes} min`

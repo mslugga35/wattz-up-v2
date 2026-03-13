@@ -9,7 +9,8 @@ import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Zap, Database, Activity, Bell, RefreshCw, Clock } from 'lucide-react';
+import { Zap, Database, Activity, Bell, RefreshCw, Clock, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 
 interface DashboardStats {
   stations: { total: number; networks: { network: string; count: number }[] };
@@ -65,9 +66,16 @@ export default function AdminPage() {
   return (
     <div className="p-8 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Zap className="w-6 h-6" /> Wattz Up Admin
-        </h1>
+        <div className="flex items-center gap-3">
+          <Link href="/">
+            <Button variant="ghost" size="icon" className="h-9 w-9">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          </Link>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Zap className="w-6 h-6" /> Wattz Up Admin
+          </h1>
+        </div>
         <Button variant="outline" size="sm" onClick={fetchStats}>
           <RefreshCw className="w-4 h-4 mr-1" /> Refresh
         </Button>

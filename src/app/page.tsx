@@ -117,8 +117,8 @@ export default function HomePage() {
       {/* Header */}
       <header className="border-b px-4 py-3 flex items-center justify-between bg-card">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-            <Zap className="w-5 h-5 text-primary-foreground" />
+          <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center">
+            <Zap className="w-5 h-5 text-white" />
           </div>
           <h1 className="text-xl font-bold">Wattz Up</h1>
         </div>
@@ -153,7 +153,7 @@ export default function HomePage() {
           <select
             value={radiusKm}
             onChange={(e) => setRadiusKm(Number(e.target.value))}
-            className="px-3 py-2 border rounded-md bg-background text-sm"
+            className="px-3 py-2 border rounded-md bg-background text-sm h-10 appearance-none cursor-pointer hover:border-emerald-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
           >
             <option value={5}>5 km</option>
             <option value={10}>10 km</option>
@@ -165,7 +165,7 @@ export default function HomePage() {
           <select
             value={networkFilter || ''}
             onChange={(e) => setNetworkFilter(e.target.value || null)}
-            className="px-3 py-2 border rounded-md bg-background text-sm flex-1"
+            className="px-3 py-2 border rounded-md bg-background text-sm flex-1 h-10 cursor-pointer hover:border-emerald-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
           >
             <option value="">All Networks</option>
             <option value="Tesla">Tesla</option>
@@ -179,7 +179,7 @@ export default function HomePage() {
           <select
             value={plugTypeFilter[0] || ''}
             onChange={(e) => setPlugTypeFilter(e.target.value ? [e.target.value] : [])}
-            className="px-3 py-2 border rounded-md bg-background text-sm flex-1"
+            className="px-3 py-2 border rounded-md bg-background text-sm flex-1 h-10 cursor-pointer hover:border-emerald-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
           >
             <option value="">All Plug Types</option>
             <option value="CCS">CCS</option>
@@ -190,24 +190,34 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Main content - split view on desktop, tabs on mobile */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+      {/* Main content - split view on desktop, stacked on mobile */}
+      <div className="flex-1 flex flex-col lg:flex-row min-h-0">
         {/* Map */}
-        <div className="h-[40vh] lg:h-full lg:flex-1">
+        <div className="h-[35vh] min-h-[200px] lg:h-full lg:flex-1 relative">
           <StationMap />
         </div>
 
+        {/* Drag handle divider - mobile only */}
+        <div className="lg:hidden flex justify-center py-1 bg-card border-y">
+          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+        </div>
+
         {/* Station list */}
-        <div className="flex-1 lg:w-[400px] lg:flex-none overflow-auto border-l">
+        <div className="flex-1 lg:w-[400px] lg:flex-none overflow-auto border-l min-h-0">
           <div className="p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold">Nearby Chargers</h2>
-              {userLocation && (
-                <Badge variant="secondary" className="text-xs">
-                  <MapPin className="w-3 h-3 mr-1" />
-                  {userLocation.latitude.toFixed(4)}, {userLocation.longitude.toFixed(4)}
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-xs sm:hidden">
+                  {stations.length} found
                 </Badge>
-              )}
+                {userLocation && (
+                  <Badge variant="secondary" className="text-xs hidden sm:flex">
+                    <MapPin className="w-3 h-3 mr-1" />
+                    {userLocation.latitude.toFixed(4)}, {userLocation.longitude.toFixed(4)}
+                  </Badge>
+                )}
+              </div>
             </div>
             <StationList />
           </div>
