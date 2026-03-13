@@ -76,8 +76,8 @@ export async function POST(request: NextRequest) {
     ];
 
     // Support batched ingestion to stay within Vercel function timeout
-    // ?batch=0 → states 0-2, ?batch=1 → 3-5, etc. No param → all states
-    const BATCH_STATES = 3;
+    // ?batch=0 → state[0], ?batch=1 → state[1], etc. No param → all states
+    const BATCH_STATES = 1;
     const { searchParams } = new URL(request.url);
     const batchParam = searchParams.get('batch');
     let states: string[];
