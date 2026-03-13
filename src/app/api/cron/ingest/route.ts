@@ -76,8 +76,8 @@ export async function POST(request: NextRequest) {
     ];
 
     // Support batched ingestion to stay within Vercel function timeout
-    // ?batch=0 → state[0], ?batch=1 → state[1], etc. No param → all states
-    const BATCH_STATES = 1;
+    // ?batch=0 → states 0-4, ?batch=1 → 5-9, etc. No param → all states
+    const BATCH_STATES = 5;
     const { searchParams } = new URL(request.url);
     const batchParam = searchParams.get('batch');
     let states: string[];
@@ -97,45 +97,33 @@ export async function POST(request: NextRequest) {
     const debugErrors: string[] = [];
 
     for (const state of states) {
-      // AFDC API max limit is 200 — paginate with offset
-      let offset = 0;
-      const PAGE_LIMIT = 200;
+      const url = new URL(`${AFDC_API_BASE}.json`);
+      url.searchParams.set('api_key', apiKey);
+      url.searchParams.set('fuel_type', 'ELEC');
+      url.searchParams.set('status', 'E');
+      url.searchParams.set('state', state);
+      url.searchParams.set('limit', '200');
 
-      while (true) {
-        const url = new URL(`${AFDC_API_BASE}.json`);
-        url.searchParams.set('api_key', apiKey);
-        url.searchParams.set('fuel_type', 'ELEC');
-        url.searchParams.set('status', 'E');
-        url.searchParams.set('state', state);
-        url.searchParams.set('limit', String(PAGE_LIMIT));
-        url.searchParams.set('offset', String(offset));
-
-        let response: Response;
-        try {
-          response = await fetch(url.toString());
-        } catch (fetchErr) {
-          const msg = `Fetch failed for ${state}: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`;
-          console.error(msg);
-          debugErrors.push(msg);
-          break;
-        }
-
-        if (!response.ok) {
-          const errText = await response.text().catch(() => '');
-          const msg = `AFDC ${state}: ${response.status} ${errText.slice(0, 200)}`;
-          console.error(msg);
-          debugErrors.push(msg);
-          break;
-        }
-
-        const data = await response.json();
-        const stations = data.fuel_stations || [];
-        allStations = allStations.concat(stations);
-
-        // If we got fewer than PAGE_LIMIT, we've reached the end
-        if (stations.length < PAGE_LIMIT) break;
-        offset += PAGE_LIMIT;
+      let response: Response;
+      try {
+        response = await fetch(url.toString());
+      } catch (fetchErr) {
+        const msg = `Fetch failed for ${state}: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`;
+        console.error(msg);
+        debugErrors.push(msg);
+        continue;
       }
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        const msg = `AFDC ${state}: ${response.status} ${errText.slice(0, 200)}`;
+        console.error(msg);
+        debugErrors.push(msg);
+        continue;
+      }
+
+      const data = await response.json();
+      allStations = allStations.concat(data.fuel_stations || []);
     }
 
     let processed = 0;
@@ -215,10 +203,6 @@ export async function POST(request: NextRequest) {
       fetched: allStations.length,
       states: states.join(','),
       batch: batchParam ?? 'all',
-      apiKeySet: !!apiKey,
-      apiKeyPrefix: apiKey.slice(0, 4),
-      debugErrors: debugErrors.slice(0, 5),
-      version: '3',
     });
   } catch (error) {
     console.error('Ingest error:', error);
