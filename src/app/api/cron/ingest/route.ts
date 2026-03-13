@@ -26,6 +26,19 @@ interface AFDCStation {
   ev_level2_evse_num: number;
   ev_pricing: string;
   access_code: string;
+  access_days_time: string;
+  facility_type: string;
+}
+
+// Parse pricing text like "$0.35/kWh" or "$0.20/min" from AFDC free-text field
+function parsePricing(pricingText: string | null): { perKwh?: number; perMin?: number } {
+  if (!pricingText) return {};
+  const kwhMatch = pricingText.match(/\$(\d+\.?\d*)\s*\/?\s*kWh/i);
+  const minMatch = pricingText.match(/\$(\d+\.?\d*)\s*\/?\s*min/i);
+  return {
+    perKwh: kwhMatch ? parseFloat(kwhMatch[1]) : undefined,
+    perMin: minMatch ? parseFloat(minMatch[1]) : undefined,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -89,7 +102,21 @@ export async function POST(request: NextRequest) {
       const batch = allStations.slice(i, i + BATCH_SIZE);
 
       const rows = batch.map((afdcStation) => {
-        const stallsTotal = (afdcStation.ev_dc_fast_num || 0) + (afdcStation.ev_level2_evse_num || 0);
+        const dcFast = afdcStation.ev_dc_fast_num || 0;
+        const level2 = afdcStation.ev_level2_evse_num || 0;
+        const stallsTotal = dcFast + level2;
+        const pricing = parsePricing(afdcStation.ev_pricing);
+
+        // Better power estimation based on network + charger type
+        let maxPowerKw = 7; // default Level 2
+        if (dcFast > 0) {
+          if (afdcStation.ev_network === 'Tesla') maxPowerKw = 250;
+          else if (afdcStation.ev_network === 'Electrify America') maxPowerKw = 350;
+          else maxPowerKw = 150; // generic DC Fast
+        } else if (level2 > 0) {
+          maxPowerKw = 19;
+        }
+
         return {
           external_id: `afdc-${afdcStation.id}`,
           source: 'afdc',
@@ -106,7 +133,9 @@ export async function POST(request: NextRequest) {
             t.toUpperCase().replace('_', ' ')
           ),
           stalls_total: stallsTotal,
-          max_power_kw: afdcStation.ev_dc_fast_num > 0 ? 150 : 19,
+          max_power_kw: maxPowerKw,
+          pricing_per_kwh: pricing.perKwh ?? null,
+          pricing_per_minute: pricing.perMin ?? null,
           access_restrictions: afdcStation.access_code,
           updated_at: new Date().toISOString(),
         };

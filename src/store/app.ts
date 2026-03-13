@@ -1,11 +1,14 @@
 /**
  * WATTZ UP v2 - App Store (Zustand)
- * Client-side state management
+ * Client-side state management with localStorage persistence
  */
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { StationWithEstimate, User } from '@/types';
+
+// Charging speed filter options
+export type SpeedFilter = 'all' | 'dc_fast' | 'level2';
 
 interface AppState {
   // User
@@ -34,9 +37,18 @@ interface AppState {
   radiusKm: number;
   networkFilter: string | null;
   plugTypeFilter: string[];
+  speedFilter: SpeedFilter;
+  showAvailableOnly: boolean;
   setRadiusKm: (radius: number) => void;
   setNetworkFilter: (network: string | null) => void;
   setPlugTypeFilter: (plugTypes: string[]) => void;
+  setSpeedFilter: (speed: SpeedFilter) => void;
+  setShowAvailableOnly: (show: boolean) => void;
+
+  // Favorites
+  favorites: string[]; // station IDs
+  toggleFavorite: (stationId: string) => void;
+  isFavorite: (stationId: string) => boolean;
 
   // Search
   searchQuery: string;
@@ -54,7 +66,7 @@ function generateDeviceId(): string {
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       // User
       user: null,
       deviceId: null,
@@ -81,9 +93,23 @@ export const useAppStore = create<AppState>()(
       radiusKm: 10,
       networkFilter: null,
       plugTypeFilter: [],
+      speedFilter: 'all',
+      showAvailableOnly: false,
       setRadiusKm: (radius) => set({ radiusKm: radius }),
       setNetworkFilter: (network) => set({ networkFilter: network }),
       setPlugTypeFilter: (plugTypes) => set({ plugTypeFilter: plugTypes }),
+      setSpeedFilter: (speed) => set({ speedFilter: speed }),
+      setShowAvailableOnly: (show) => set({ showAvailableOnly: show }),
+
+      // Favorites
+      favorites: [],
+      toggleFavorite: (stationId) =>
+        set((state) => ({
+          favorites: state.favorites.includes(stationId)
+            ? state.favorites.filter((id) => id !== stationId)
+            : [...state.favorites, stationId],
+        })),
+      isFavorite: (stationId) => get().favorites.includes(stationId),
 
       // Search
       searchQuery: '',
@@ -100,6 +126,8 @@ export const useAppStore = create<AppState>()(
         radiusKm: state.radiusKm,
         networkFilter: state.networkFilter,
         plugTypeFilter: state.plugTypeFilter,
+        speedFilter: state.speedFilter,
+        favorites: state.favorites,
       }),
     }
   )

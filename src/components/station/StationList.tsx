@@ -2,7 +2,7 @@
 
 /**
  * WATTZ UP v2 - Station List Component
- * Scrollable list of nearby stations
+ * Scrollable list of nearby stations with pricing, power, favorites
  */
 
 import { useAppStore } from '@/store/app';
@@ -11,23 +11,76 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportDialog } from './ReportDialog';
-import { Zap, Clock, Navigation, ChevronRight, MessageSquarePlus } from 'lucide-react';
+import {
+  Zap,
+  Clock,
+  Navigation,
+  ChevronRight,
+  MessageSquarePlus,
+  Heart,
+  DollarSign,
+  Gauge,
+} from 'lucide-react';
+
+// Format power level for display
+function formatPower(maxPowerKw: number | undefined): string | null {
+  if (!maxPowerKw) return null;
+  if (maxPowerKw >= 50) return `${maxPowerKw} kW DC Fast`;
+  if (maxPowerKw >= 7) return `${maxPowerKw} kW Level 2`;
+  return `${maxPowerKw} kW Level 1`;
+}
+
+// Format pricing for display
+function formatPricing(perKwh?: number, perMin?: number): string | null {
+  if (perKwh) return `$${perKwh.toFixed(2)}/kWh`;
+  if (perMin) return `$${perMin.toFixed(2)}/min`;
+  return null;
+}
 
 export function StationList() {
-  const { stations, selectedStation, setSelectedStation, isLoading, searchQuery } = useAppStore();
+  const {
+    stations,
+    selectedStation,
+    setSelectedStation,
+    isLoading,
+    searchQuery,
+    speedFilter,
+    showAvailableOnly,
+    favorites,
+    toggleFavorite,
+  } = useAppStore();
 
-  // Filter stations by search query
-  const filteredStations = searchQuery.trim()
-    ? stations.filter((s) => {
-        const q = searchQuery.toLowerCase();
-        return (
-          s.name?.toLowerCase().includes(q) ||
-          s.network?.toLowerCase().includes(q) ||
-          s.city?.toLowerCase().includes(q) ||
-          s.address?.toLowerCase().includes(q)
-        );
-      })
-    : stations;
+  // Apply client-side filters
+  let filteredStations = stations;
+
+  // Search query filter
+  if (searchQuery.trim()) {
+    const q = searchQuery.toLowerCase();
+    filteredStations = filteredStations.filter(
+      (s) =>
+        s.name?.toLowerCase().includes(q) ||
+        s.network?.toLowerCase().includes(q) ||
+        s.city?.toLowerCase().includes(q) ||
+        s.address?.toLowerCase().includes(q)
+    );
+  }
+
+  // Speed filter
+  if (speedFilter === 'dc_fast') {
+    filteredStations = filteredStations.filter((s) => (s.maxPowerKw ?? 0) >= 50);
+  } else if (speedFilter === 'level2') {
+    filteredStations = filteredStations.filter(
+      (s) => (s.maxPowerKw ?? 0) >= 7 && (s.maxPowerKw ?? 0) < 50
+    );
+  }
+
+  // Available now filter (only stations with short/no wait)
+  if (showAvailableOnly) {
+    filteredStations = filteredStations.filter((s) => {
+      const wait = s.estimate?.etaWaitMinutes;
+      return wait !== null && wait !== undefined && wait <= 5;
+    });
+  }
 
   // Get badge style based on wait time
   const getWaitBadgeStyle = (waitMinutes: number | null | undefined) => {
@@ -62,7 +115,7 @@ export function StationList() {
       <div className="text-center py-8 text-gray-500">
         <Zap className="w-12 h-12 mx-auto mb-4 opacity-50" />
         <p>No stations found nearby</p>
-        <p className="text-sm">Try expanding your search radius</p>
+        <p className="text-sm">Try expanding your search radius or adjusting filters</p>
       </div>
     );
   }
@@ -72,6 +125,9 @@ export function StationList() {
       {filteredStations.map((station) => {
         const isSelected = selectedStation?.id === station.id;
         const waitMinutes = station.estimate?.etaWaitMinutes;
+        const isFav = favorites.includes(station.id);
+        const pricing = formatPricing(station.pricingPerKwh, station.pricingPerMinute);
+        const power = formatPower(station.maxPowerKw);
 
         return (
           <Card
@@ -83,13 +139,30 @@ export function StationList() {
           >
             <div className="flex justify-between items-start">
               <div className="flex-1">
-                <h3 className="font-semibold text-sm mb-1 line-clamp-1">{station.name}</h3>
+                <div className="flex items-start gap-1">
+                  <h3 className="font-semibold text-sm mb-1 line-clamp-1 flex-1">{station.name}</h3>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(station.id);
+                    }}
+                    className="flex-shrink-0 p-0.5 -mt-0.5"
+                    title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+                  >
+                    <Heart
+                      className={`w-4 h-4 transition-colors ${
+                        isFav ? 'fill-red-500 text-red-500' : 'text-muted-foreground hover:text-red-400'
+                      }`}
+                    />
+                  </button>
+                </div>
                 <p className="text-xs text-muted-foreground mb-2">
                   {station.network || 'Unknown Network'}
-                  {station.city && ` • ${station.city}`}
+                  {station.city && ` \u2022 ${station.city}`}
+                  {station.state && `, ${station.state}`}
                 </p>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {/* Wait time badge */}
                   <Badge variant={getWaitBadgeStyle(waitMinutes).variant} className={getWaitBadgeStyle(waitMinutes).className}>
                     <Clock className="w-3 h-3 mr-1" />
@@ -97,6 +170,14 @@ export function StationList() {
                       ? `${waitMinutes} min`
                       : 'Unknown'}
                   </Badge>
+
+                  {/* Power level */}
+                  {power && (
+                    <Badge variant="outline" className="text-xs">
+                      <Gauge className="w-3 h-3 mr-1" />
+                      {power}
+                    </Badge>
+                  )}
 
                   {/* Stalls */}
                   {station.stallsTotal > 0 && (
@@ -111,6 +192,14 @@ export function StationList() {
                     <Badge variant="outline" className="text-xs">
                       <Navigation className="w-3 h-3 mr-1" />
                       {station.distance.toFixed(1)} km
+                    </Badge>
+                  )}
+
+                  {/* Pricing */}
+                  {pricing && (
+                    <Badge variant="outline" className="text-xs">
+                      <DollarSign className="w-3 h-3 mr-1" />
+                      {pricing}
                     </Badge>
                   )}
                 </div>

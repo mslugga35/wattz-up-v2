@@ -10,7 +10,7 @@ import Map, { Marker, Popup, NavigationControl, GeolocateControl } from 'react-m
 import { useAppStore } from '@/store/app';
 import { StationWithEstimate } from '@/types';
 import { Badge } from '@/components/ui/badge';
-import { Zap, Clock, Navigation } from 'lucide-react';
+import { Zap, Clock, Navigation, DollarSign, Gauge } from 'lucide-react';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 export function StationMap() {
@@ -118,17 +118,24 @@ export function StationMap() {
             closeOnClick={false}
             offset={20}
           >
-            <div className="p-2 min-w-[200px]">
+            <div className="p-2 min-w-[220px]">
               <h3 className="font-semibold text-sm mb-1">{selectedStation.name}</h3>
               <p className="text-xs text-gray-600 mb-2">
                 {selectedStation.network || 'Unknown Network'}
+                {selectedStation.city && ` \u2022 ${selectedStation.city}`}
               </p>
 
-              <div className="flex gap-2 mb-2">
+              <div className="flex flex-wrap gap-1.5 mb-2">
                 {selectedStation.stallsTotal > 0 && (
                   <Badge variant="outline" className="text-xs">
                     <Zap className="w-3 h-3 mr-1" />
                     {selectedStation.stallsTotal} stalls
+                  </Badge>
+                )}
+                {selectedStation.maxPowerKw && (
+                  <Badge variant="outline" className="text-xs">
+                    <Gauge className="w-3 h-3 mr-1" />
+                    {selectedStation.maxPowerKw} kW
                   </Badge>
                 )}
                 {selectedStation.distance !== undefined && (
@@ -137,10 +144,22 @@ export function StationMap() {
                     {selectedStation.distance.toFixed(1)} km
                   </Badge>
                 )}
+                {selectedStation.pricingPerKwh && (
+                  <Badge variant="outline" className="text-xs">
+                    <DollarSign className="w-3 h-3 mr-1" />
+                    ${selectedStation.pricingPerKwh.toFixed(2)}/kWh
+                  </Badge>
+                )}
+                {!selectedStation.pricingPerKwh && selectedStation.pricingPerMinute && (
+                  <Badge variant="outline" className="text-xs">
+                    <DollarSign className="w-3 h-3 mr-1" />
+                    ${selectedStation.pricingPerMinute.toFixed(2)}/min
+                  </Badge>
+                )}
               </div>
 
               {selectedStation.estimate && (
-                <div className="flex items-center gap-1 text-sm">
+                <div className="flex items-center gap-1 text-sm mb-2">
                   <Clock className="w-4 h-4" />
                   <span>
                     {selectedStation.estimate.etaWaitMinutes !== null
@@ -150,13 +169,17 @@ export function StationMap() {
                 </div>
               )}
 
-              <div className="mt-2 flex flex-wrap gap-1">
-                {selectedStation.plugTypes.slice(0, 3).map((plug) => (
+              <div className="flex flex-wrap gap-1">
+                {selectedStation.plugTypes.slice(0, 4).map((plug) => (
                   <Badge key={plug} variant="secondary" className="text-xs">
                     {plug}
                   </Badge>
                 ))}
               </div>
+
+              {selectedStation.address && (
+                <p className="text-xs text-gray-500 mt-2">{selectedStation.address}</p>
+              )}
             </div>
           </Popup>
         )}

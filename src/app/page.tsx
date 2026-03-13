@@ -21,7 +21,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Toaster } from '@/components/ui/sonner';
-import { Zap, RefreshCw, Search, MapPin, HelpCircle } from 'lucide-react';
+import { Zap, RefreshCw, Search, MapPin, HelpCircle, CheckCircle } from 'lucide-react';
+import { SpeedFilter } from '@/store/app';
 
 export default function HomePage() {
   const {
@@ -43,6 +44,10 @@ export default function HomePage() {
     setNetworkFilter,
     plugTypeFilter,
     setPlugTypeFilter,
+    speedFilter,
+    setSpeedFilter,
+    showAvailableOnly,
+    setShowAvailableOnly,
   } = useAppStore();
 
   // Initialize device on mount
@@ -193,6 +198,28 @@ export default function HomePage() {
             <option value="CHADEMO">CHAdeMO</option>
             <option value="J1772">J1772</option>
           </select>
+        </div>
+        <div className="flex gap-2">
+          <select
+            value={speedFilter}
+            onChange={(e) => setSpeedFilter(e.target.value as SpeedFilter)}
+            className="px-3 py-2 border rounded-md bg-background text-sm flex-1 h-10 cursor-pointer hover:border-emerald-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
+          >
+            <option value="all">All Speeds</option>
+            <option value="dc_fast">DC Fast (50+ kW)</option>
+            <option value="level2">Level 2 (7-49 kW)</option>
+          </select>
+          <button
+            onClick={() => setShowAvailableOnly(!showAvailableOnly)}
+            className={`px-3 py-2 border rounded-md text-sm h-10 flex items-center gap-1.5 cursor-pointer transition-colors ${
+              showAvailableOnly
+                ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
+                : 'bg-background hover:border-emerald-400'
+            }`}
+          >
+            <CheckCircle className="w-4 h-4" />
+            Available Now
+          </button>
         </div>
       </div>
 
