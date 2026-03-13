@@ -10,6 +10,7 @@ import dynamic from 'next/dynamic';
 import { useAppStore } from '@/store/app';
 import { fetchNearbyStations, registerDevice } from '@/lib/api';
 import { StationList } from '@/components/station/StationList';
+import Link from 'next/link';
 
 // Dynamic import to avoid SSR issues with Mapbox GL
 const StationMap = dynamic(
@@ -20,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Toaster } from '@/components/ui/sonner';
-import { Zap, RefreshCw, Search, MapPin } from 'lucide-react';
+import { Zap, RefreshCw, Search, MapPin, HelpCircle } from 'lucide-react';
 
 export default function HomePage() {
   const {
@@ -127,6 +128,11 @@ export default function HomePage() {
           <Badge variant="outline" className="hidden sm:flex">
             {stations.length} stations
           </Badge>
+          <Link href="/help">
+            <Button variant="ghost" size="icon" title="Help & Support">
+              <HelpCircle className="w-4 h-4" />
+            </Button>
+          </Link>
           <Button
             variant="outline"
             size="icon"

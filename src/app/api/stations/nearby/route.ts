@@ -58,7 +58,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform raw Supabase rows to API shape
-    let nearbyStations = (stations || []).map((row: Record<string, unknown>) =>
+    type MappedStation = ReturnType<typeof mapStationRow>;
+    let nearbyStations: MappedStation[] = (stations || []).map((row: Record<string, unknown>) =>
       mapStationRow(row, (row as Record<string, number>).distance_km)
     );
 
