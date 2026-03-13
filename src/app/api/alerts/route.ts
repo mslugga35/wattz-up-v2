@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     // Get user
     const { data: user } = await supabase
-      .from('users')
+      .from('wattz_users')
       .select('id')
       .eq('device_id', deviceId)
       .single();
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     // Verify station exists
     const { data: station } = await supabase
-      .from('stations')
+      .from('wattz_stations')
       .select('id')
       .eq('id', data.stationId)
       .single();
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     const expiresAt = new Date(Date.now() + ALERT_TTL_MS).toISOString();
 
     const { data: newAlert, error } = await supabase
-      .from('alerts')
+      .from('wattz_alerts')
       .insert({
         user_id: user.id,
         station_id: data.stationId,
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
 
     // Get user
     const { data: user } = await supabase
-      .from('users')
+      .from('wattz_users')
       .select('id')
       .eq('device_id', deviceId)
       .single();
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
 
     // Get user's alerts
     const { data: alerts, error } = await supabase
-      .from('alerts')
+      .from('wattz_alerts')
       .select('id, station_id, condition_type, condition_value, status, created_at, expires_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
@@ -147,7 +147,7 @@ export async function DELETE(request: NextRequest) {
 
     // Get user
     const { data: user } = await supabase
-      .from('users')
+      .from('wattz_users')
       .select('id')
       .eq('device_id', deviceId)
       .single();
@@ -158,7 +158,7 @@ export async function DELETE(request: NextRequest) {
 
     // Delete alert
     const { error } = await supabase
-      .from('alerts')
+      .from('wattz_alerts')
       .delete()
       .eq('id', alertId)
       .eq('user_id', user.id);

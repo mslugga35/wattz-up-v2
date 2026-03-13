@@ -83,7 +83,7 @@ function calculateConfidence(
 
 async function getStationMetadata(stationId: string): Promise<StationMeta | null> {
   const { data, error } = await supabase
-    .from('stations')
+    .from('wattz_stations')
     .select('id, stalls_total, max_power_kw')
     .eq('id', stationId)
     .single();
@@ -103,7 +103,7 @@ async function getSessionStats(stationId: string): Promise<SessionStatsRecord | 
   const hourOfDay = now.getHours();
 
   const { data, error } = await supabase
-    .from('session_stats_hourly')
+    .from('wattz_session_stats_hourly')
     .select('*')
     .eq('station_id', stationId)
     .eq('day_of_week', dayOfWeek)
@@ -128,7 +128,7 @@ async function getRecentObservations(stationId: string, hoursBack: number = 2): 
   const cutoff = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
 
   const { data, error } = await supabase
-    .from('observations')
+    .from('wattz_observations')
     .select('id, station_id, observation_type, queue_position, session_duration_min, observed_at')
     .eq('station_id', stationId)
     .gte('observed_at', cutoff)
@@ -169,9 +169,15 @@ export async function estimateWaitTime(stationId: string): Promise<Estimate> {
     if (recentObs.length > 0) {
       sources.push('crowd_recent');
 
+      // Status-based observations (from UI: available, short_wait, long_wait, full)
+      const statusObs = recentObs.filter((obs) =>
+        ['available', 'short_wait', 'long_wait', 'full'].includes(obs.observation_type)
+      );
+      // Queue-based observations (detailed: in_queue with position)
       const queueObs = recentObs.filter(
         (obs) => obs.observation_type === 'in_queue' && obs.queue_position
       );
+      // Session-based observations (done_charging with duration)
       const sessionObs = recentObs.filter(
         (obs) => obs.observation_type === 'done_charging' && obs.session_duration_min
       );
@@ -191,6 +197,19 @@ export async function estimateWaitTime(stationId: string): Promise<Estimate> {
           0
         ) / sessionObs.length;
         crowdEstimate = avgSessionDuration * 0.5;
+      } else if (statusObs.length > 0) {
+        // Convert status reports to wait estimate
+        const statusWeights: Record<string, number> = {
+          available: 0,
+          short_wait: 8,
+          long_wait: 25,
+          full: 45,
+        };
+        const totalWeight = statusObs.reduce(
+          (sum, obs) => sum + (statusWeights[obs.observation_type] ?? 15),
+          0
+        );
+        crowdEstimate = totalWeight / statusObs.length;
       }
 
       const mostRecentObs = recentObs[0];

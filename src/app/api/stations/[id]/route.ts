@@ -16,7 +16,7 @@ export async function GET(
 
     // Fetch station
     const { data: station, error } = await supabase
-      .from('stations')
+      .from('wattz_stations')
       .select('*')
       .eq('id', id)
       .is('deleted_at', null)
@@ -40,7 +40,7 @@ export async function GET(
         name: station.name,
         latitude: Number(station.latitude),
         longitude: Number(station.longitude),
-        geohash6: station.geohash6,
+        geohash6: station.geohash_6,
         address: station.address,
         city: station.city,
         state: station.state,

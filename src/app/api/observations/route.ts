@@ -36,7 +36,7 @@ function checkRateLimit(deviceId: string): boolean {
 const submitSchema = z.object({
   stationId: z.string().uuid(),
   deviceId: z.string().min(10).max(100), // Validate deviceId format
-  observationType: z.enum(['available', 'short_wait', 'long_wait', 'full']),
+  observationType: z.enum(['available', 'short_wait', 'long_wait', 'full', 'in_queue', 'plugged_in', 'done_charging']),
   queuePosition: z.number().int().min(0).max(50).nullish(),
   stallsAvailable: z.number().int().min(0).max(100).nullish(),
 });
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
 
     // Get station for geohash
     const { data: station } = await supabase
-      .from('stations')
+      .from('wattz_stations')
       .select('geohash_6')
       .eq('id', data.stationId)
       .single();
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const { data: newObs, error } = await supabase
-      .from('observations')
+      .from('wattz_observations')
       .insert({
         station_id: data.stationId,
         user_hash: userHash,
@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     const { data: observations, error } = await supabase
-      .from('observations')
+      .from('wattz_observations')
       .select('id, observation_type, queue_position, stalls_available, observed_at, trust_score')
       .eq('station_id', stationId)
       .gte('observed_at', cutoff)

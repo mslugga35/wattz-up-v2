@@ -1,11 +1,11 @@
 /**
  * GET /api/stations/nearby
- * Find charging stations near a location
+ * Find charging stations near a location using PostGIS
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db/client';
-import { haversineDistance } from '@/lib/utils/geohash';
+import { estimateWaitTimeBatch } from '@/lib/services/estimator';
 import { z } from 'zod';
 
 const querySchema = z.object({
@@ -31,94 +31,80 @@ export async function GET(request: NextRequest) {
     });
 
     if (!parsed.success) {
-      console.error('Validation error:', parsed.error.flatten());
       return NextResponse.json(
         { error: 'Invalid parameters', details: parsed.error.flatten() },
         { status: 400 }
       );
     }
 
-    console.log('Fetching stations near:', parsed.data);
-
     const { latitude, longitude, radiusKm, network, plugTypes, limit } = parsed.data;
 
-    // Query stations from Supabase
-    let query = supabase
-      .from('stations')
-      .select('*')
-      .is('deleted_at', null);
-
-    // Apply network filter if specified
-    if (network) {
-      query = query.eq('network', network);
-    }
-
-    // Get all stations (we'll filter by distance in JS)
-    // For production, use PostGIS RPC function
-    const { data: stations, error } = await query.limit(500);
+    // Use PostGIS RPC for spatial query (ST_DWithin on GIST index)
+    const { data: stations, error } = await supabase.rpc('wattz_nearby_stations', {
+      lat: latitude,
+      lng: longitude,
+      radius_km: radiusKm,
+      max_results: limit,
+      network_filter: network || null,
+    });
 
     if (error) {
       console.error('Error fetching stations:', error);
       return NextResponse.json(
-        { error: 'Failed to fetch stations', details: error.message },
+        { error: 'Failed to fetch stations' },
         { status: 500 }
       );
     }
 
-    // Filter by distance and transform
-    const nearbyStations = (stations || [])
-      .map((station) => {
-        const distance = haversineDistance(
-          latitude,
-          longitude,
-          Number(station.latitude),
-          Number(station.longitude)
-        );
-        return {
-          id: station.id,
-          externalId: station.external_id,
-          source: station.source,
-          name: station.name,
-          latitude: Number(station.latitude),
-          longitude: Number(station.longitude),
-          geohash6: station.geohash_6,
-          address: station.address,
-          city: station.city,
-          state: station.state,
-          zip: station.zip,
-          network: station.network,
-          plugTypes: station.plug_types || [],
-          stallsTotal: station.stalls_total || 4,
-          maxPowerKw: station.max_power_kw,
-          pricingPerKwh: station.pricing_per_kwh ? Number(station.pricing_per_kwh) : undefined,
-          pricingPerMinute: station.pricing_per_minute ? Number(station.pricing_per_minute) : undefined,
-          amenities: station.amenities || [],
-          accessRestrictions: station.access_restrictions,
-          dataQualityScore: Number(station.data_quality_score) || 0.5,
-          createdAt: new Date(station.created_at),
-          updatedAt: new Date(station.updated_at),
-          distance,
-          estimate: null, // TODO: Add estimation
-        };
-      })
-      .filter((station) => station.distance <= radiusKm)
-      .sort((a, b) => a.distance - b.distance)
-      .slice(0, limit);
+    // Transform to API shape
+    let nearbyStations = (stations || []).map((station: any) => ({
+      id: station.id,
+      externalId: station.external_id,
+      source: station.source,
+      name: station.name,
+      latitude: Number(station.latitude),
+      longitude: Number(station.longitude),
+      geohash6: station.geohash_6,
+      address: station.address,
+      city: station.city,
+      state: station.state,
+      zip: station.zip,
+      network: station.network,
+      plugTypes: station.plug_types || [],
+      stallsTotal: station.stalls_total || 4,
+      maxPowerKw: station.max_power_kw,
+      pricingPerKwh: station.pricing_per_kwh ? Number(station.pricing_per_kwh) : undefined,
+      pricingPerMinute: station.pricing_per_minute ? Number(station.pricing_per_minute) : undefined,
+      amenities: station.amenities || [],
+      accessRestrictions: station.access_restrictions,
+      dataQualityScore: Number(station.data_quality_score) || 0.5,
+      createdAt: new Date(station.created_at),
+      updatedAt: new Date(station.updated_at),
+      distance: station.distance_km,
+    }));
 
     // Filter by plug types if specified
-    let filteredStations = nearbyStations;
     if (plugTypes) {
       const requestedPlugs = plugTypes.split(',').map((p) => p.trim().toUpperCase());
-      filteredStations = nearbyStations.filter((station) =>
+      nearbyStations = nearbyStations.filter((station: any) =>
         station.plugTypes.some((plug: string) => requestedPlugs.includes(plug.toUpperCase()))
       );
     }
 
+    // Batch estimate wait times
+    const stationIds = nearbyStations.map((s: any) => s.id);
+    const estimates = await estimateWaitTimeBatch(stationIds);
+
+    const stationsWithEstimates = nearbyStations.map((station: any) => ({
+      ...station,
+      estimate: estimates.get(station.id) ?? null,
+    }));
+
     return NextResponse.json({
-      stations: filteredStations,
+      stations: stationsWithEstimates,
       searchCenter: { latitude, longitude },
       radiusKm,
-      totalFound: filteredStations.length,
+      totalFound: stationsWithEstimates.length,
     });
   } catch (error) {
     console.error('Error fetching nearby stations:', error);

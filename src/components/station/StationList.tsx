@@ -19,7 +19,20 @@ interface StationListProps {
 }
 
 export function StationList({ onStationSelect }: StationListProps) {
-  const { stations, selectedStation, setSelectedStation, isLoading } = useAppStore();
+  const { stations, selectedStation, setSelectedStation, isLoading, searchQuery } = useAppStore();
+
+  // Filter stations by search query
+  const filteredStations = searchQuery.trim()
+    ? stations.filter((s) => {
+        const q = searchQuery.toLowerCase();
+        return (
+          s.name?.toLowerCase().includes(q) ||
+          s.network?.toLowerCase().includes(q) ||
+          s.city?.toLowerCase().includes(q) ||
+          s.address?.toLowerCase().includes(q)
+        );
+      })
+    : stations;
 
   const handleSelect = (station: StationWithEstimate) => {
     setSelectedStation(station);
@@ -51,7 +64,7 @@ export function StationList({ onStationSelect }: StationListProps) {
     );
   }
 
-  if (stations.length === 0) {
+  if (filteredStations.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
         <Zap className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -63,7 +76,7 @@ export function StationList({ onStationSelect }: StationListProps) {
 
   return (
     <div className="space-y-3">
-      {stations.map((station) => {
+      {filteredStations.map((station) => {
         const isSelected = selectedStation?.id === station.id;
         const waitMinutes = station.estimate?.etaWaitMinutes;
 

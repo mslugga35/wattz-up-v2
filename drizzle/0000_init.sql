@@ -1,11 +1,12 @@
 -- WATTZ UP v2 - Database Schema
--- Run this in Supabase SQL Editor
+-- All tables prefixed with wattz_ to avoid collisions on shared Supabase instance
+-- Supabase project: ebhtzgimevacvcgiyesc
 
 -- Enable PostGIS extension
 CREATE EXTENSION IF NOT EXISTS postgis;
 
 -- ============ STATIONS TABLE ============
-CREATE TABLE IF NOT EXISTS stations (
+CREATE TABLE IF NOT EXISTS wattz_stations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   external_id VARCHAR(255) UNIQUE NOT NULL,
   source VARCHAR(50) NOT NULL,
@@ -39,14 +40,13 @@ CREATE TABLE IF NOT EXISTS stations (
   deleted_at TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_stations_geohash6 ON stations(geohash_6);
-CREATE INDEX IF NOT EXISTS idx_stations_network ON stations(network);
-CREATE INDEX IF NOT EXISTS idx_stations_source ON stations(source);
+CREATE INDEX IF NOT EXISTS idx_wattz_stations_geohash6 ON wattz_stations(geohash_6);
+CREATE INDEX IF NOT EXISTS idx_wattz_stations_network ON wattz_stations(network);
+CREATE INDEX IF NOT EXISTS idx_wattz_stations_source ON wattz_stations(source);
 
--- Add PostGIS geography column for spatial queries
-ALTER TABLE stations ADD COLUMN IF NOT EXISTS location GEOGRAPHY(POINT, 4326);
+-- PostGIS geography column + trigger for automatic lat/lng → location sync
+ALTER TABLE wattz_stations ADD COLUMN IF NOT EXISTS location GEOGRAPHY(POINT, 4326);
 
--- Create trigger to auto-update location from lat/lng
 CREATE OR REPLACE FUNCTION update_station_location()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -55,17 +55,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS stations_location_trigger ON stations;
-CREATE TRIGGER stations_location_trigger
-  BEFORE INSERT OR UPDATE ON stations
+DROP TRIGGER IF EXISTS wattz_stations_location_trigger ON wattz_stations;
+CREATE TRIGGER wattz_stations_location_trigger
+  BEFORE INSERT OR UPDATE ON wattz_stations
   FOR EACH ROW
   EXECUTE FUNCTION update_station_location();
 
--- Spatial index for nearby queries
-CREATE INDEX IF NOT EXISTS idx_stations_location ON stations USING GIST(location);
+CREATE INDEX IF NOT EXISTS idx_wattz_stations_location ON wattz_stations USING GIST(location);
 
 -- ============ USERS TABLE ============
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE IF NOT EXISTS wattz_users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   device_id VARCHAR(64) UNIQUE NOT NULL,
   platform VARCHAR(10) NOT NULL,
@@ -75,12 +74,12 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_users_device ON users(device_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_wattz_users_device ON wattz_users(device_id);
 
 -- ============ OBSERVATIONS TABLE ============
-CREATE TABLE IF NOT EXISTS observations (
+CREATE TABLE IF NOT EXISTS wattz_observations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  station_id UUID NOT NULL REFERENCES stations(id),
+  station_id UUID NOT NULL REFERENCES wattz_stations(id),
   user_hash VARCHAR(64) NOT NULL,
 
   observation_type VARCHAR(20) NOT NULL,
@@ -95,15 +94,15 @@ CREATE TABLE IF NOT EXISTS observations (
   expires_at TIMESTAMPTZ NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_observations_station ON observations(station_id);
-CREATE INDEX IF NOT EXISTS idx_observations_observed ON observations(observed_at);
-CREATE INDEX IF NOT EXISTS idx_observations_type ON observations(observation_type);
+CREATE INDEX IF NOT EXISTS idx_wattz_observations_station ON wattz_observations(station_id);
+CREATE INDEX IF NOT EXISTS idx_wattz_observations_observed ON wattz_observations(observed_at);
+CREATE INDEX IF NOT EXISTS idx_wattz_observations_type ON wattz_observations(observation_type);
 
 -- ============ ALERTS TABLE ============
-CREATE TABLE IF NOT EXISTS alerts (
+CREATE TABLE IF NOT EXISTS wattz_alerts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id),
-  station_id UUID NOT NULL REFERENCES stations(id),
+  user_id UUID NOT NULL REFERENCES wattz_users(id),
+  station_id UUID NOT NULL REFERENCES wattz_stations(id),
 
   condition_type VARCHAR(30) NOT NULL,
   condition_value INTEGER NOT NULL,
@@ -116,14 +115,14 @@ CREATE TABLE IF NOT EXISTS alerts (
   triggered_at TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_alerts_user ON alerts(user_id);
-CREATE INDEX IF NOT EXISTS idx_alerts_station ON alerts(station_id);
-CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status);
+CREATE INDEX IF NOT EXISTS idx_wattz_alerts_user ON wattz_alerts(user_id);
+CREATE INDEX IF NOT EXISTS idx_wattz_alerts_station ON wattz_alerts(station_id);
+CREATE INDEX IF NOT EXISTS idx_wattz_alerts_status ON wattz_alerts(status);
 
 -- ============ SESSION STATS TABLE ============
-CREATE TABLE IF NOT EXISTS session_stats_hourly (
+CREATE TABLE IF NOT EXISTS wattz_session_stats_hourly (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  station_id UUID NOT NULL REFERENCES stations(id),
+  station_id UUID NOT NULL REFERENCES wattz_stations(id),
   day_of_week INTEGER NOT NULL,
   hour_of_day INTEGER NOT NULL,
 
@@ -135,11 +134,11 @@ CREATE TABLE IF NOT EXISTS session_stats_hourly (
   last_computed_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_session_stats_station ON session_stats_hourly(station_id);
-CREATE INDEX IF NOT EXISTS idx_session_stats_time ON session_stats_hourly(day_of_week, hour_of_day);
+CREATE INDEX IF NOT EXISTS idx_wattz_session_stats_station ON wattz_session_stats_hourly(station_id);
+CREATE INDEX IF NOT EXISTS idx_wattz_session_stats_time ON wattz_session_stats_hourly(day_of_week, hour_of_day);
 
 -- ============ INGEST JOBS TABLE ============
-CREATE TABLE IF NOT EXISTS ingest_jobs (
+CREATE TABLE IF NOT EXISTS wattz_ingest_jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   source VARCHAR(20) NOT NULL,
   status VARCHAR(20) DEFAULT 'pending',
@@ -150,48 +149,112 @@ CREATE TABLE IF NOT EXISTS ingest_jobs (
   completed_at TIMESTAMPTZ
 );
 
+-- ============ PostGIS NEARBY RPC ============
+-- Spatial query using ST_DWithin on GIST index (replaces JS-side haversine)
+CREATE OR REPLACE FUNCTION wattz_nearby_stations(
+  lat DOUBLE PRECISION,
+  lng DOUBLE PRECISION,
+  radius_km DOUBLE PRECISION DEFAULT 10,
+  max_results INTEGER DEFAULT 50,
+  network_filter TEXT DEFAULT NULL
+)
+RETURNS TABLE (
+  id UUID,
+  external_id VARCHAR,
+  source VARCHAR,
+  name VARCHAR,
+  latitude DECIMAL,
+  longitude DECIMAL,
+  geohash_6 VARCHAR,
+  address TEXT,
+  city VARCHAR,
+  state VARCHAR,
+  zip VARCHAR,
+  network VARCHAR,
+  plug_types TEXT[],
+  stalls_total INTEGER,
+  max_power_kw INTEGER,
+  pricing_per_kwh DECIMAL,
+  pricing_per_minute DECIMAL,
+  amenities TEXT[],
+  access_restrictions TEXT,
+  data_quality_score DECIMAL,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ,
+  distance_km DOUBLE PRECISION
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    s.id, s.external_id, s.source, s.name,
+    s.latitude, s.longitude, s.geohash_6,
+    s.address, s.city, s.state, s.zip,
+    s.network, s.plug_types, s.stalls_total, s.max_power_kw,
+    s.pricing_per_kwh, s.pricing_per_minute,
+    s.amenities, s.access_restrictions, s.data_quality_score,
+    s.created_at, s.updated_at,
+    ST_Distance(
+      s.location,
+      ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography
+    ) / 1000.0 AS distance_km
+  FROM wattz_stations s
+  WHERE s.deleted_at IS NULL
+    AND ST_DWithin(
+      s.location,
+      ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography,
+      radius_km * 1000
+    )
+    AND (network_filter IS NULL OR s.network = network_filter)
+  ORDER BY distance_km
+  LIMIT max_results;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
 -- ============ ROW LEVEL SECURITY ============
--- Enable RLS on all tables
-ALTER TABLE stations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE observations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wattz_stations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wattz_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wattz_observations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wattz_alerts ENABLE ROW LEVEL SECURITY;
 
--- Public read access to stations
-CREATE POLICY "Stations are viewable by everyone" ON stations
+DROP POLICY IF EXISTS "Stations are viewable by everyone" ON wattz_stations;
+CREATE POLICY "Stations are viewable by everyone" ON wattz_stations
   FOR SELECT USING (true);
 
--- Users can only see their own data
-CREATE POLICY "Users can view own profile" ON users
+DROP POLICY IF EXISTS "Users can view own profile" ON wattz_users;
+CREATE POLICY "Users can view own profile" ON wattz_users
   FOR SELECT USING (true);
 
-CREATE POLICY "Users can insert own profile" ON users
+DROP POLICY IF EXISTS "Users can insert own profile" ON wattz_users;
+CREATE POLICY "Users can insert own profile" ON wattz_users
   FOR INSERT WITH CHECK (true);
 
--- Observations are public read, authenticated write
-CREATE POLICY "Observations are viewable by everyone" ON observations
+DROP POLICY IF EXISTS "Observations are viewable by everyone" ON wattz_observations;
+CREATE POLICY "Observations are viewable by everyone" ON wattz_observations
   FOR SELECT USING (true);
 
-CREATE POLICY "Authenticated users can insert observations" ON observations
+DROP POLICY IF EXISTS "Authenticated users can insert observations" ON wattz_observations;
+CREATE POLICY "Authenticated users can insert observations" ON wattz_observations
   FOR INSERT WITH CHECK (true);
 
--- Alerts: users can manage their own
-CREATE POLICY "Users can view own alerts" ON alerts
+DROP POLICY IF EXISTS "Users can view own alerts" ON wattz_alerts;
+CREATE POLICY "Users can view own alerts" ON wattz_alerts
   FOR SELECT USING (true);
 
-CREATE POLICY "Users can insert own alerts" ON alerts
+DROP POLICY IF EXISTS "Users can insert own alerts" ON wattz_alerts;
+CREATE POLICY "Users can insert own alerts" ON wattz_alerts
   FOR INSERT WITH CHECK (true);
 
-CREATE POLICY "Users can delete own alerts" ON alerts
+DROP POLICY IF EXISTS "Users can delete own alerts" ON wattz_alerts;
+CREATE POLICY "Users can delete own alerts" ON wattz_alerts
   FOR DELETE USING (true);
 
--- Grant access to anon and authenticated roles
-GRANT SELECT ON stations TO anon, authenticated;
-GRANT SELECT, INSERT ON users TO anon, authenticated;
-GRANT SELECT, INSERT ON observations TO anon, authenticated;
-GRANT SELECT, INSERT, DELETE ON alerts TO anon, authenticated;
-GRANT SELECT ON session_stats_hourly TO anon, authenticated;
-GRANT SELECT, INSERT, UPDATE ON ingest_jobs TO authenticated;
-
--- Done!
-SELECT 'Schema created successfully!' as status;
+-- ============ GRANTS ============
+GRANT SELECT ON wattz_stations TO anon, authenticated;
+GRANT SELECT, INSERT ON wattz_users TO anon, authenticated;
+GRANT SELECT, INSERT ON wattz_observations TO anon, authenticated;
+GRANT SELECT, INSERT, DELETE ON wattz_alerts TO anon, authenticated;
+GRANT SELECT ON wattz_session_stats_hourly TO anon, authenticated;
+GRANT SELECT, INSERT, DELETE ON wattz_session_stats_hourly TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON wattz_ingest_jobs TO authenticated;
+GRANT SELECT, UPDATE ON wattz_alerts TO authenticated;
+GRANT EXECUTE ON FUNCTION wattz_nearby_stations TO anon, authenticated;

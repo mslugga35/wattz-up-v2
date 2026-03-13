@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
   // Create ingest job record
   const { data: job, error: jobError } = await supabase
-    .from('ingest_jobs')
+    .from('wattz_ingest_jobs')
     .insert({ source: 'afdc', status: 'running' })
     .select()
     .single();
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
 
       // Check if exists
       const { data: existing } = await supabase
-        .from('stations')
+        .from('wattz_stations')
         .select('id')
         .eq('external_id', externalId)
         .limit(1);
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       if (existing && existing.length > 0) {
         // Update existing
         await supabase
-          .from('stations')
+          .from('wattz_stations')
           .update({
             name: afdcStation.station_name,
             latitude: afdcStation.latitude,
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
         updated++;
       } else {
         // Create new
-        const { error: insertError } = await supabase.from('stations').insert({
+        const { error: insertError } = await supabase.from('wattz_stations').insert({
           external_id: externalId,
           source: 'afdc',
           name: afdcStation.station_name,
@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
     // Update job record
     if (job) {
       await supabase
-        .from('ingest_jobs')
+        .from('wattz_ingest_jobs')
         .update({
           status: 'completed',
           records_processed: processed,
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
 
     if (job) {
       await supabase
-        .from('ingest_jobs')
+        .from('wattz_ingest_jobs')
         .update({
           status: 'failed',
           error_message: error instanceof Error ? error.message : 'Unknown error',

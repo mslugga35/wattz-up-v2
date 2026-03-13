@@ -30,15 +30,15 @@ export async function POST(request: NextRequest) {
 
     // Check if device already registered
     const { data: existing, error: selectError } = await supabase
-      .from('users')
-      .select('*')
+      .from('wattz_users')
+      .select('id, device_id, platform, trust_score, created_at')
       .eq('device_id', data.deviceId)
       .limit(1);
 
     if (selectError) {
       console.error('Error checking user:', selectError);
       return NextResponse.json(
-        { error: 'Database error', details: selectError.message },
+        { error: 'Database error' },
         { status: 500 }
       );
     }
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
 
     // Create new user
     const { data: newUser, error: insertError } = await supabase
-      .from('users')
+      .from('wattz_users')
       .insert({
         device_id: data.deviceId,
         platform: data.platform,
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       console.error('Error creating user:', insertError);
       return NextResponse.json(
-        { error: 'Failed to create user', details: insertError.message },
+        { error: 'Failed to create user' },
         { status: 500 }
       );
     }

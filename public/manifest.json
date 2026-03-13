@@ -58,13 +58,5 @@
     }
   ],
   "categories": ["utilities", "navigation", "lifestyle"],
-  "screenshots": [
-    {
-      "src": "/screenshots/map-view.png",
-      "sizes": "1080x1920",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Map view showing nearby EV chargers"
-    }
-  ]
+  "screenshots": []
 }

@@ -38,6 +38,10 @@ interface AppState {
   setNetworkFilter: (network: string | null) => void;
   setPlugTypeFilter: (plugTypes: string[]) => void;
 
+  // Search
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+
   // Loading states
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
@@ -80,6 +84,10 @@ export const useAppStore = create<AppState>()(
       setRadiusKm: (radius) => set({ radiusKm: radius }),
       setNetworkFilter: (network) => set({ networkFilter: network }),
       setPlugTypeFilter: (plugTypes) => set({ plugTypeFilter: plugTypes }),
+
+      // Search
+      searchQuery: '',
+      setSearchQuery: (query) => set({ searchQuery: query }),
 
       // Loading
       isLoading: false,

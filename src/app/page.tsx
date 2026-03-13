@@ -6,10 +6,16 @@
  */
 
 import { useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { useAppStore } from '@/store/app';
 import { fetchNearbyStations, registerDevice } from '@/lib/api';
-import { StationMap } from '@/components/map/StationMap';
 import { StationList } from '@/components/station/StationList';
+
+// Dynamic import to avoid SSR issues with Mapbox GL
+const StationMap = dynamic(
+  () => import('@/components/map/StationMap').then((mod) => mod.StationMap),
+  { ssr: false, loading: () => <div className="w-full h-full bg-muted animate-pulse" /> }
+);
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +36,12 @@ export default function HomePage() {
     deviceId,
     setDeviceId,
     setUser,
+    searchQuery,
+    setSearchQuery,
+    networkFilter,
+    setNetworkFilter,
+    plugTypeFilter,
+    setPlugTypeFilter,
   } = useAppStore();
 
   // Initialize device on mount
@@ -83,6 +95,8 @@ export default function HomePage() {
     try {
       const result = await fetchNearbyStations(location.latitude, location.longitude, {
         radiusKm,
+        network: networkFilter || undefined,
+        plugTypes: plugTypeFilter.length > 0 ? plugTypeFilter : undefined,
         limit: 50,
       });
       setStations(result.stations);
@@ -91,12 +105,12 @@ export default function HomePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [mapCenter, radiusKm, setStations, setIsLoading]);
+  }, [mapCenter, radiusKm, networkFilter, plugTypeFilter, setStations, setIsLoading]);
 
   // Fetch on map center or radius change
   useEffect(() => {
     fetchStations();
-  }, [mapCenter.latitude, mapCenter.longitude, radiusKm]);
+  }, [mapCenter.latitude, mapCenter.longitude, radiusKm, networkFilter, plugTypeFilter]);
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -124,14 +138,16 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Search bar */}
-      <div className="p-4 border-b bg-card">
+      {/* Search + filters bar */}
+      <div className="p-4 border-b bg-card space-y-2">
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search stations..."
               className="pl-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
           <select
@@ -143,6 +159,33 @@ export default function HomePage() {
             <option value={10}>10 km</option>
             <option value={25}>25 km</option>
             <option value={50}>50 km</option>
+          </select>
+        </div>
+        <div className="flex gap-2">
+          <select
+            value={networkFilter || ''}
+            onChange={(e) => setNetworkFilter(e.target.value || null)}
+            className="px-3 py-2 border rounded-md bg-background text-sm flex-1"
+          >
+            <option value="">All Networks</option>
+            <option value="Tesla">Tesla</option>
+            <option value="ChargePoint Network">ChargePoint</option>
+            <option value="Electrify America">Electrify America</option>
+            <option value="EVgo">EVgo</option>
+            <option value="Blink Network">Blink</option>
+            <option value="FLO">FLO</option>
+            <option value="Non-Networked">Non-Networked</option>
+          </select>
+          <select
+            value={plugTypeFilter[0] || ''}
+            onChange={(e) => setPlugTypeFilter(e.target.value ? [e.target.value] : [])}
+            className="px-3 py-2 border rounded-md bg-background text-sm flex-1"
+          >
+            <option value="">All Plug Types</option>
+            <option value="CCS">CCS</option>
+            <option value="NACS">NACS (Tesla)</option>
+            <option value="CHADEMO">CHAdeMO</option>
+            <option value="J1772">J1772</option>
           </select>
         </div>
       </div>

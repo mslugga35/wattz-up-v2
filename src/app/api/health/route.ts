@@ -12,7 +12,7 @@ export async function GET() {
   // Check database
   const dbStart = Date.now();
   try {
-    const { error } = await supabase.from('stations').select('id').limit(1);
+    const { error } = await supabase.from('wattz_stations').select('id').limit(1);
     if (error) throw error;
     checks.database = {
       status: 'healthy',
