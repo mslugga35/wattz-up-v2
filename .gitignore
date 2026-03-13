@@ -17,6 +17,10 @@
 /.next/
 /out/
 
+# serwist/PWA build artifacts (generated at build time)
+/public/sw.js
+/public/sw.js.map
+
 # production
 /build
 

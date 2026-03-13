@@ -14,16 +14,27 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Wattz Up - EV Charger Wait Times",
-  description: "Real-time wait time estimates for 65,000+ EV charging stations. Find available chargers, check wait times, and get notifications when your favorite station is ready.",
+  description: "Find EV chargers near you with real-time wait estimates",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "Wattz Up",
+    startupImage: "/icons/icon-512x512.png",
+  },
+  icons: {
+    apple: [
+      { url: "/icons/icon-152x152.png", sizes: "152x152", type: "image/png" },
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
+    icon: [
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
   },
   openGraph: {
     title: "Wattz Up - EV Charger Wait Times",
-    description: "Real-time wait time estimates for 65,000+ EV charging stations",
+    description: "Find EV chargers near you with real-time wait estimates",
     type: "website",
   },
 };
