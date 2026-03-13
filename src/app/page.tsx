@@ -21,8 +21,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Toaster } from '@/components/ui/sonner';
-import { Zap, RefreshCw, Search, MapPin, HelpCircle, CheckCircle } from 'lucide-react';
+import { Zap, RefreshCw, Search, MapPin, HelpCircle, CheckCircle, Car } from 'lucide-react';
 import { SpeedFilter } from '@/store/app';
+import { EV_VEHICLES } from '@/lib/data/vehicles';
 
 export default function HomePage() {
   const {
@@ -48,6 +49,8 @@ export default function HomePage() {
     setSpeedFilter,
     showAvailableOnly,
     setShowAvailableOnly,
+    selectedVehicle,
+    setSelectedVehicle,
   } = useAppStore();
 
   // Initialize device on mount
@@ -171,6 +174,33 @@ export default function HomePage() {
             <option value={25}>25 km</option>
             <option value={50}>50 km</option>
           </select>
+        </div>
+        {/* Vehicle selector */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Car className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <select
+              value={selectedVehicle?.id || ''}
+              onChange={(e) => {
+                const vehicle = EV_VEHICLES.find((v) => v.id === e.target.value) || null;
+                setSelectedVehicle(vehicle);
+              }}
+              className="w-full pl-10 pr-3 py-2 border rounded-md bg-background text-sm h-10 cursor-pointer hover:border-emerald-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
+            >
+              <option value="">My Vehicle (All Plugs)</option>
+              {EV_VEHICLES.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.make} {v.model} ({v.year})
+                </option>
+              ))}
+            </select>
+          </div>
+          {selectedVehicle && (
+            <Badge variant="outline" className="h-10 px-3 flex items-center gap-1 text-xs whitespace-nowrap">
+              <Zap className="w-3 h-3" />
+              {selectedVehicle.rangeKm} km range
+            </Badge>
+          )}
         </div>
         <div className="flex gap-2">
           <select

@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { StationWithEstimate, User } from '@/types';
+import { EVVehicle } from '@/lib/data/vehicles';
 
 // Charging speed filter options
 export type SpeedFilter = 'all' | 'dc_fast' | 'level2';
@@ -49,6 +50,10 @@ interface AppState {
   favorites: string[]; // station IDs
   toggleFavorite: (stationId: string) => void;
   isFavorite: (stationId: string) => boolean;
+
+  // Vehicle profile
+  selectedVehicle: EVVehicle | null;
+  setSelectedVehicle: (vehicle: EVVehicle | null) => void;
 
   // Search
   searchQuery: string;
@@ -111,6 +116,10 @@ export const useAppStore = create<AppState>()(
         })),
       isFavorite: (stationId) => get().favorites.includes(stationId),
 
+      // Vehicle
+      selectedVehicle: null,
+      setSelectedVehicle: (vehicle) => set({ selectedVehicle: vehicle }),
+
       // Search
       searchQuery: '',
       setSearchQuery: (query) => set({ searchQuery: query }),
@@ -128,6 +137,7 @@ export const useAppStore = create<AppState>()(
         plugTypeFilter: state.plugTypeFilter,
         speedFilter: state.speedFilter,
         favorites: state.favorites,
+        selectedVehicle: state.selectedVehicle,
       }),
     }
   )

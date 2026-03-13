@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       url.searchParams.set('fuel_type', 'ELEC');
       url.searchParams.set('status', 'E');
       url.searchParams.set('state', state);
-      url.searchParams.set('limit', '200');
+      url.searchParams.set('limit', '10000');
 
       // Fetch state data (don't log state names in production)
 

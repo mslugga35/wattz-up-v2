@@ -20,6 +20,8 @@ import {
   Heart,
   DollarSign,
   Gauge,
+  AlertTriangle,
+  BatteryCharging,
 } from 'lucide-react';
 
 // Format power level for display
@@ -48,6 +50,7 @@ export function StationList() {
     showAvailableOnly,
     favorites,
     toggleFavorite,
+    selectedVehicle,
   } = useAppStore();
 
   // Apply client-side filters
@@ -80,6 +83,18 @@ export function StationList() {
       const wait = s.estimate?.etaWaitMinutes;
       return wait !== null && wait !== undefined && wait <= 5;
     });
+  }
+
+  // Vehicle compatibility filter — show compatible first, incompatible at bottom
+  if (selectedVehicle) {
+    const vehiclePlugs = selectedVehicle.plugTypes.map((p) => p.toUpperCase());
+    const compatible = filteredStations.filter((s) =>
+      s.plugTypes.some((p) => vehiclePlugs.includes(p.toUpperCase()))
+    );
+    const incompatible = filteredStations.filter(
+      (s) => !s.plugTypes.some((p) => vehiclePlugs.includes(p.toUpperCase()))
+    );
+    filteredStations = [...compatible, ...incompatible];
   }
 
   // Get badge style based on wait time
@@ -129,12 +144,24 @@ export function StationList() {
         const pricing = formatPricing(station.pricingPerKwh, station.pricingPerMinute);
         const power = formatPower(station.maxPowerKw);
 
+        // Vehicle compatibility
+        const isCompatible = selectedVehicle
+          ? station.plugTypes.some((p) =>
+              selectedVehicle.plugTypes.map((vp) => vp.toUpperCase()).includes(p.toUpperCase())
+            )
+          : true;
+
+        // Estimated charge time (10-80% = 70% of battery)
+        const chargeTimeMin = selectedVehicle && station.maxPowerKw
+          ? Math.round((selectedVehicle.batteryKwh * 0.7) / Math.min(station.maxPowerKw, selectedVehicle.maxChargeKw) * 60)
+          : null;
+
         return (
           <Card
             key={station.id}
             className={`p-4 cursor-pointer transition-all hover:shadow-md ${
               isSelected ? 'ring-2 ring-primary' : ''
-            }`}
+            } ${!isCompatible ? 'opacity-50' : ''}`}
             onClick={() => setSelectedStation(station)}
           >
             <div className="flex justify-between items-start">
@@ -200,6 +227,22 @@ export function StationList() {
                     <Badge variant="outline" className="text-xs">
                       <DollarSign className="w-3 h-3 mr-1" />
                       {pricing}
+                    </Badge>
+                  )}
+
+                  {/* Charge time estimate */}
+                  {chargeTimeMin && isCompatible && (
+                    <Badge variant="outline" className="text-xs">
+                      <BatteryCharging className="w-3 h-3 mr-1" />
+                      ~{chargeTimeMin} min charge
+                    </Badge>
+                  )}
+
+                  {/* Incompatible warning */}
+                  {!isCompatible && selectedVehicle && (
+                    <Badge variant="destructive" className="text-xs">
+                      <AlertTriangle className="w-3 h-3 mr-1" />
+                      Incompatible
                     </Badge>
                   )}
                 </div>
