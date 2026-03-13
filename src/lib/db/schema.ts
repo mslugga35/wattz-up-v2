@@ -1,6 +1,9 @@
 /**
- * WATTZ UP v2 - Drizzle Schema
- * PostgreSQL + PostGIS schema for Supabase
+ * WATTZ UP v2 - Drizzle Schema (documentation-only)
+ *
+ * This file defines the Drizzle ORM schema for reference and type generation.
+ * The actual database is managed via raw SQL migrations in drizzle/0000_init.sql.
+ * Supabase client (src/lib/db/client.ts) is used for all queries at runtime.
  */
 
 import {
@@ -15,7 +18,6 @@ import {
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
 
 // ============ STATIONS TABLE ============
 

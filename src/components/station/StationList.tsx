@@ -6,7 +6,6 @@
  */
 
 import { useAppStore } from '@/store/app';
-import { StationWithEstimate } from '@/types';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,11 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ReportDialog } from './ReportDialog';
 import { Zap, Clock, Navigation, ChevronRight, MessageSquarePlus } from 'lucide-react';
 
-interface StationListProps {
-  onStationSelect?: (station: StationWithEstimate) => void;
-}
-
-export function StationList({ onStationSelect }: StationListProps) {
+export function StationList() {
   const { stations, selectedStation, setSelectedStation, isLoading, searchQuery } = useAppStore();
 
   // Filter stations by search query
@@ -33,11 +28,6 @@ export function StationList({ onStationSelect }: StationListProps) {
         );
       })
     : stations;
-
-  const handleSelect = (station: StationWithEstimate) => {
-    setSelectedStation(station);
-    onStationSelect?.(station);
-  };
 
   // Get badge style based on wait time
   const getWaitBadgeStyle = (waitMinutes: number | null | undefined) => {
@@ -89,7 +79,7 @@ export function StationList({ onStationSelect }: StationListProps) {
             className={`p-4 cursor-pointer transition-all hover:shadow-md ${
               isSelected ? 'ring-2 ring-primary' : ''
             }`}
-            onClick={() => handleSelect(station)}
+            onClick={() => setSelectedStation(station)}
           >
             <div className="flex justify-between items-start">
               <div className="flex-1">
@@ -109,7 +99,7 @@ export function StationList({ onStationSelect }: StationListProps) {
                   </Badge>
 
                   {/* Stalls */}
-                  {station.stallsTotal && (
+                  {station.stallsTotal > 0 && (
                     <Badge variant="outline" className="text-xs">
                       <Zap className="w-3 h-3 mr-1" />
                       {station.stallsTotal} stalls

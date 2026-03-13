@@ -57,24 +57,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Transform to API shape
-    let nearbyStations = (stations || []).map((station: any) =>
-      mapStationRow(station, station.distance_km)
+    // Transform raw Supabase rows to API shape
+    let nearbyStations = (stations || []).map((row: Record<string, unknown>) =>
+      mapStationRow(row, (row as Record<string, number>).distance_km)
     );
 
     // Filter by plug types if specified
     if (plugTypes) {
       const requestedPlugs = plugTypes.split(',').map((p) => p.trim().toUpperCase());
-      nearbyStations = nearbyStations.filter((station: any) =>
+      nearbyStations = nearbyStations.filter((station) =>
         station.plugTypes.some((plug: string) => requestedPlugs.includes(plug.toUpperCase()))
       );
     }
 
     // Batch estimate wait times
-    const stationIds = nearbyStations.map((s: any) => s.id);
+    const stationIds = nearbyStations.map((s) => s.id);
     const estimates = await estimateWaitTimeBatch(stationIds);
 
-    const stationsWithEstimates = nearbyStations.map((station: any) => ({
+    const stationsWithEstimates = nearbyStations.map((station) => ({
       ...station,
       estimate: estimates.get(station.id) ?? null,
     }));

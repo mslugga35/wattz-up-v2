@@ -81,8 +81,6 @@ export async function POST(request: NextRequest) {
       allStations = allStations.concat(data.fuel_stations || []);
     }
 
-    console.log(`Total stations fetched: ${allStations.length}`);
-
     let processed = 0;
     const BATCH_SIZE = 100;
 

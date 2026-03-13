@@ -6,8 +6,6 @@
 // ============ ENUMS ============
 
 export const EstimationMode = {
-  realtime: 'realtime',     // Mode 1: M/M/c queue (needs 100+ data points)
-  hybrid: 'hybrid',         // Mode 2: Hybrid (30-100 data points)
   fallback: 'fallback',     // Mode 3: Fallback heuristic (our MVP)
   no_data: 'no_data',       // No data available
 } as const;
@@ -34,7 +32,7 @@ export const AlertStatus = {
 
 export type AlertStatus = typeof AlertStatus[keyof typeof AlertStatus];
 
-export type ConfidenceSource = 'crowd_recent' | 'historical' | 'heuristic' | 'realtime_api';
+export type ConfidenceSource = 'crowd_recent' | 'historical' | 'heuristic';
 
 // ============ CORE TYPES ============
 

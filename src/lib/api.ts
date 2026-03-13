@@ -84,13 +84,6 @@ export async function submitObservation(data: SubmitObservationRequest): Promise
   });
 }
 
-export async function fetchObservations(stationId: string): Promise<{
-  observations: unknown[];
-  stationId: string;
-}> {
-  return apiFetch(`/observations?stationId=${stationId}`);
-}
-
 // ============ USERS ============
 
 export async function registerDevice(
@@ -122,13 +115,3 @@ export async function createAlert(data: {
   });
 }
 
-export async function fetchAlerts(): Promise<{
-  alerts: unknown[];
-  count: number;
-}> {
-  return apiFetch('/alerts');
-}
-
-export async function deleteAlert(alertId: string): Promise<{ message: string }> {
-  return apiFetch(`/alerts?id=${alertId}`, { method: 'DELETE' });
-}

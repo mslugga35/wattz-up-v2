@@ -5,20 +5,15 @@
  * Mapbox GL JS map with station markers
  */
 
-import { useRef, useCallback } from 'react';
-import Map, { Marker, Popup, NavigationControl, GeolocateControl, MapRef } from 'react-map-gl/mapbox';
+import { useCallback } from 'react';
+import Map, { Marker, Popup, NavigationControl, GeolocateControl } from 'react-map-gl/mapbox';
 import { useAppStore } from '@/store/app';
 import { StationWithEstimate } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Zap, Clock, Navigation } from 'lucide-react';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-interface StationMapProps {
-  onStationSelect?: (station: StationWithEstimate) => void;
-}
-
-export function StationMap({ onStationSelect }: StationMapProps) {
-  const mapRef = useRef<MapRef>(null);
+export function StationMap() {
 
   const {
     stations,
@@ -47,7 +42,6 @@ export function StationMap({ onStationSelect }: StationMapProps) {
   // Handle marker click
   const handleMarkerClick = (station: StationWithEstimate) => {
     setSelectedStation(station);
-    onStationSelect?.(station);
   };
 
   // Get marker color based on wait time
@@ -62,7 +56,6 @@ export function StationMap({ onStationSelect }: StationMapProps) {
   return (
     <div className="relative w-full h-full min-h-[400px]">
       <Map
-        ref={mapRef}
         mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
         initialViewState={{
           latitude: mapCenter.latitude,
@@ -132,7 +125,7 @@ export function StationMap({ onStationSelect }: StationMapProps) {
               </p>
 
               <div className="flex gap-2 mb-2">
-                {selectedStation.stallsTotal && (
+                {selectedStation.stallsTotal > 0 && (
                   <Badge variant="outline" className="text-xs">
                     <Zap className="w-3 h-3 mr-1" />
                     {selectedStation.stallsTotal} stalls
