@@ -63,14 +63,33 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Fetch from multiple states
-    const states = [
+    // All US states + DC
+    const ALL_STATES = [
       'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
       'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
       'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
       'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
       'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'
     ];
+
+    // Support batched ingestion to stay within Vercel function timeout
+    // ?batch=0 → states 0-9, ?batch=1 → 10-19, etc. No param → all states
+    const BATCH_STATES = 10;
+    const { searchParams } = new URL(request.url);
+    const batchParam = searchParams.get('batch');
+    let states: string[];
+
+    if (batchParam !== null) {
+      const batchNum = parseInt(batchParam, 10);
+      const start = batchNum * BATCH_STATES;
+      states = ALL_STATES.slice(start, start + BATCH_STATES);
+      if (states.length === 0) {
+        return NextResponse.json({ success: true, message: 'No states in this batch', processed: 0 });
+      }
+    } else {
+      states = ALL_STATES;
+    }
+
     let allStations: AFDCStation[] = [];
 
     for (const state of states) {
@@ -168,6 +187,8 @@ export async function POST(request: NextRequest) {
       success: true,
       jobId: job?.id,
       processed,
+      states: states.join(','),
+      batch: batchParam ?? 'all',
     });
   } catch (error) {
     console.error('Ingest error:', error);
