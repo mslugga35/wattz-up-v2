@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
     }
 
     let allStations: AFDCStation[] = [];
+    const debugErrors: string[] = [];
 
     for (const state of states) {
       const url = new URL(`${AFDC_API_BASE}.json`);
@@ -107,13 +108,17 @@ export async function POST(request: NextRequest) {
       try {
         response = await fetch(url.toString());
       } catch (fetchErr) {
-        console.error(`AFDC fetch failed for ${state}:`, fetchErr);
+        const msg = `Fetch failed for ${state}: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`;
+        console.error(msg);
+        debugErrors.push(msg);
         continue;
       }
 
       if (!response.ok) {
         const errText = await response.text().catch(() => '');
-        console.error(`AFDC API error for ${state}: ${response.status} ${errText.slice(0, 200)}`);
+        const msg = `AFDC ${state}: ${response.status} ${errText.slice(0, 200)}`;
+        console.error(msg);
+        debugErrors.push(msg);
         continue;
       }
 
@@ -201,7 +206,9 @@ export async function POST(request: NextRequest) {
       states: states.join(','),
       batch: batchParam ?? 'all',
       apiKeySet: !!apiKey,
-      version: '2',
+      apiKeyPrefix: apiKey.slice(0, 4),
+      debugErrors: debugErrors.slice(0, 5),
+      version: '3',
     });
   } catch (error) {
     console.error('Ingest error:', error);
