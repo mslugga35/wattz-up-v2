@@ -103,8 +103,6 @@ export async function POST(request: NextRequest) {
       url.searchParams.set('state', state);
       url.searchParams.set('limit', '10000');
 
-      // Fetch state data (don't log state names in production)
-
       const response = await fetch(url.toString());
 
       if (!response.ok) {
@@ -113,6 +111,8 @@ export async function POST(request: NextRequest) {
       }
 
       const data = await response.json();
+      const stationCount = data.fuel_stations?.length ?? 0;
+      console.log(`State ${state}: ${stationCount} stations (total_results: ${data.total_results})`);
       allStations = allStations.concat(data.fuel_stations || []);
     }
 
@@ -190,6 +190,7 @@ export async function POST(request: NextRequest) {
       success: true,
       jobId: job?.id,
       processed,
+      fetched: allStations.length,
       states: states.join(','),
       batch: batchParam ?? 'all',
     });
