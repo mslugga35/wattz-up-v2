@@ -18,6 +18,14 @@ const RATE_WINDOW_MS = 60 * 1000;
 
 function checkRateLimit(deviceId: string): boolean {
   const now = Date.now();
+
+  // Purge stale entries every 100 checks to prevent memory leak
+  if (rateLimitMap.size > 1000) {
+    for (const [key, val] of rateLimitMap) {
+      if (now > val.resetAt) rateLimitMap.delete(key);
+    }
+  }
+
   const entry = rateLimitMap.get(deviceId);
 
   if (!entry || now > entry.resetAt) {
@@ -90,8 +98,8 @@ export async function POST(request: NextRequest) {
         station_id: data.stationId,
         user_hash: userHash,
         observation_type: data.observationType,
-        queue_position: data.queuePosition || null,
-        stalls_available: data.stallsAvailable || null,
+        queue_position: data.queuePosition ?? null,
+        stalls_available: data.stallsAvailable ?? null,
         geohash_6: station.geohash_6,
         trust_score: 0.5,
         expires_at: expiresAt,

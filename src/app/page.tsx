@@ -107,10 +107,10 @@ export default function HomePage() {
     }
   }, [mapCenter, radiusKm, networkFilter, plugTypeFilter, setStations, setIsLoading]);
 
-  // Fetch on map center or radius change
+  // Fetch on map center, radius, or filter change
   useEffect(() => {
     fetchStations();
-  }, [mapCenter.latitude, mapCenter.longitude, radiusKm, networkFilter, plugTypeFilter]);
+  }, [fetchStations]);
 
   return (
     <div className="flex flex-col h-screen bg-background">

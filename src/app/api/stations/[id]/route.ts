@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db/client';
 import { estimateWaitTime } from '@/lib/services/estimator';
+import { mapStationRow } from '@/lib/mappers/station';
 
 export async function GET(
   request: NextRequest,
@@ -33,30 +34,7 @@ export async function GET(
     const estimate = await estimateWaitTime(id);
 
     return NextResponse.json({
-      station: {
-        id: station.id,
-        externalId: station.external_id,
-        source: station.source,
-        name: station.name,
-        latitude: Number(station.latitude),
-        longitude: Number(station.longitude),
-        geohash6: station.geohash_6,
-        address: station.address,
-        city: station.city,
-        state: station.state,
-        zip: station.zip,
-        network: station.network,
-        plugTypes: station.plug_types || [],
-        stallsTotal: station.stalls_total || 4,
-        maxPowerKw: station.max_power_kw,
-        pricingPerKwh: station.pricing_per_kwh ? Number(station.pricing_per_kwh) : undefined,
-        pricingPerMinute: station.pricing_per_minute ? Number(station.pricing_per_minute) : undefined,
-        amenities: station.amenities || [],
-        accessRestrictions: station.access_restrictions,
-        dataQualityScore: Number(station.data_quality_score) || 0.5,
-        createdAt: station.created_at,
-        updatedAt: station.updated_at,
-      },
+      station: mapStationRow(station),
       estimate,
     });
   } catch (error) {

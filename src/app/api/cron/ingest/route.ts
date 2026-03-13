@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db/client';
 import { encodeGeohash6 } from '@/lib/utils/geohash';
-import crypto from 'crypto';
+import { verifyCronAuth } from '@/lib/auth/verify-cron';
 
 const AFDC_API_BASE = 'https://developer.nrel.gov/api/alt-fuel-stations/v1';
 
@@ -28,25 +28,9 @@ interface AFDCStation {
   access_code: string;
 }
 
-// Timing-safe token comparison to prevent timing attacks
-function verifyToken(provided: string, expected: string): boolean {
-  if (provided.length !== expected.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
-}
-
 export async function POST(request: NextRequest) {
-  // Verify cron secret with timing-safe comparison
-  const authHeader = request.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (!cronSecret || !authHeader?.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const providedToken = authHeader.slice(7); // Remove "Bearer "
-  if (!verifyToken(providedToken, cronSecret)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
 
   const apiKey = process.env.AFDC_API_KEY;
   if (!apiKey) {
@@ -97,78 +81,48 @@ export async function POST(request: NextRequest) {
       allStations = allStations.concat(data.fuel_stations || []);
     }
 
-    const afdcStations: AFDCStation[] = allStations;
-    console.log(`Total stations fetched: ${afdcStations.length}`);
+    console.log(`Total stations fetched: ${allStations.length}`);
 
     let processed = 0;
-    let created = 0;
-    let updated = 0;
+    const BATCH_SIZE = 100;
 
-    for (const afdcStation of afdcStations) {
-      const externalId = `afdc-${afdcStation.id}`;
-      const geohash6 = encodeGeohash6(afdcStation.latitude, afdcStation.longitude);
-      const stallsTotal = (afdcStation.ev_dc_fast_num || 0) + (afdcStation.ev_level2_evse_num || 0);
-      const maxPowerKw = afdcStation.ev_dc_fast_num > 0 ? 150 : 19;
-      const plugTypes = (afdcStation.ev_connector_types || []).map((t: string) =>
-        t.toUpperCase().replace('_', ' ')
-      );
+    // Process in batches using upsert (eliminates N+1 queries)
+    for (let i = 0; i < allStations.length; i += BATCH_SIZE) {
+      const batch = allStations.slice(i, i + BATCH_SIZE);
 
-      // Check if exists
-      const { data: existing } = await supabase
-        .from('wattz_stations')
-        .select('id')
-        .eq('external_id', externalId)
-        .limit(1);
-
-      if (existing && existing.length > 0) {
-        // Update existing
-        await supabase
-          .from('wattz_stations')
-          .update({
-            name: afdcStation.station_name,
-            latitude: afdcStation.latitude,
-            longitude: afdcStation.longitude,
-            geohash_6: geohash6,
-            address: afdcStation.street_address,
-            city: afdcStation.city,
-            state: afdcStation.state,
-            zip: afdcStation.zip,
-            network: afdcStation.ev_network,
-            plug_types: plugTypes,
-            stalls_total: stallsTotal,
-            max_power_kw: maxPowerKw,
-            access_restrictions: afdcStation.access_code,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('external_id', externalId);
-        updated++;
-      } else {
-        // Create new
-        const { error: insertError } = await supabase.from('wattz_stations').insert({
-          external_id: externalId,
+      const rows = batch.map((afdcStation) => {
+        const stallsTotal = (afdcStation.ev_dc_fast_num || 0) + (afdcStation.ev_level2_evse_num || 0);
+        return {
+          external_id: `afdc-${afdcStation.id}`,
           source: 'afdc',
           name: afdcStation.station_name,
           latitude: afdcStation.latitude,
           longitude: afdcStation.longitude,
-          geohash_6: geohash6,
+          geohash_6: encodeGeohash6(afdcStation.latitude, afdcStation.longitude),
           address: afdcStation.street_address,
           city: afdcStation.city,
           state: afdcStation.state,
           zip: afdcStation.zip,
           network: afdcStation.ev_network,
-          plug_types: plugTypes,
+          plug_types: (afdcStation.ev_connector_types || []).map((t: string) =>
+            t.toUpperCase().replace('_', ' ')
+          ),
           stalls_total: stallsTotal,
-          max_power_kw: maxPowerKw,
+          max_power_kw: afdcStation.ev_dc_fast_num > 0 ? 150 : 19,
           access_restrictions: afdcStation.access_code,
-        });
-        if (insertError) {
-          console.error('Insert error for station', externalId, ':', insertError.message);
-        } else {
-          created++;
-        }
+          updated_at: new Date().toISOString(),
+        };
+      });
+
+      const { error: upsertError } = await supabase
+        .from('wattz_stations')
+        .upsert(rows, { onConflict: 'external_id' });
+
+      if (upsertError) {
+        console.error(`Batch upsert error at offset ${i}:`, upsertError.message);
       }
 
-      processed++;
+      processed += batch.length;
     }
 
     // Update job record
@@ -187,8 +141,6 @@ export async function POST(request: NextRequest) {
       success: true,
       jobId: job?.id,
       processed,
-      created,
-      updated,
     });
   } catch (error) {
     console.error('Ingest error:', error);
