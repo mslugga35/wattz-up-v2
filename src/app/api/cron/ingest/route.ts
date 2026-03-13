@@ -103,10 +103,17 @@ export async function POST(request: NextRequest) {
       url.searchParams.set('state', state);
       url.searchParams.set('limit', '10000');
 
-      const response = await fetch(url.toString());
+      let response: Response;
+      try {
+        response = await fetch(url.toString());
+      } catch (fetchErr) {
+        console.error(`AFDC fetch failed for ${state}:`, fetchErr);
+        continue;
+      }
 
       if (!response.ok) {
-        console.error(`AFDC API error for ${state}: ${response.status}`);
+        const errText = await response.text().catch(() => '');
+        console.error(`AFDC API error for ${state}: ${response.status} ${errText.slice(0, 200)}`);
         continue;
       }
 
@@ -193,6 +200,8 @@ export async function POST(request: NextRequest) {
       fetched: allStations.length,
       states: states.join(','),
       batch: batchParam ?? 'all',
+      apiKeySet: !!apiKey,
+      version: '2',
     });
   } catch (error) {
     console.error('Ingest error:', error);
