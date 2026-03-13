@@ -22,6 +22,7 @@ import {
   Gauge,
   AlertTriangle,
   BatteryCharging,
+  ShieldCheck,
 } from 'lucide-react';
 
 // Format power level for display
@@ -51,6 +52,7 @@ export function StationList() {
     favorites,
     toggleFavorite,
     selectedVehicle,
+    sortBy,
   } = useAppStore();
 
   // Apply client-side filters
@@ -96,6 +98,26 @@ export function StationList() {
     );
     filteredStations = [...compatible, ...incompatible];
   }
+
+  // Sort stations
+  if (sortBy === 'wait_time') {
+    filteredStations = [...filteredStations].sort((a, b) => {
+      const aWait = a.estimate?.etaWaitMinutes ?? 999;
+      const bWait = b.estimate?.etaWaitMinutes ?? 999;
+      return aWait - bWait;
+    });
+  } else if (sortBy === 'price') {
+    filteredStations = [...filteredStations].sort((a, b) => {
+      const aPrice = a.pricingPerKwh ?? a.pricingPerMinute ?? 999;
+      const bPrice = b.pricingPerKwh ?? b.pricingPerMinute ?? 999;
+      return aPrice - bPrice;
+    });
+  } else if (sortBy === 'power') {
+    filteredStations = [...filteredStations].sort((a, b) => {
+      return (b.maxPowerKw ?? 0) - (a.maxPowerKw ?? 0);
+    });
+  }
+  // 'distance' is default — already sorted by distance from API
 
   // Get badge style based on wait time
   const getWaitBadgeStyle = (waitMinutes: number | null | undefined) => {
@@ -150,6 +172,14 @@ export function StationList() {
               selectedVehicle.plugTypes.map((vp) => vp.toUpperCase()).includes(p.toUpperCase())
             )
           : true;
+
+        // Reliability score: blend confidence + data quality (0-100)
+        const confidence = station.estimate?.confidence ?? 0;
+        const reliability = Math.round(
+          (confidence * 0.6 + station.dataQualityScore * 0.4) * 100
+        );
+        const reliabilityLabel = reliability >= 60 ? 'High' : reliability >= 30 ? 'Med' : 'Low';
+        const reliabilityColor = reliability >= 60 ? 'text-emerald-600' : reliability >= 30 ? 'text-amber-500' : 'text-gray-400';
 
         // Estimated charge time (10-80% = 70% of battery)
         const chargeTimeMin = selectedVehicle && station.maxPowerKw
@@ -235,6 +265,14 @@ export function StationList() {
                     <Badge variant="outline" className="text-xs">
                       <BatteryCharging className="w-3 h-3 mr-1" />
                       ~{chargeTimeMin} min charge
+                    </Badge>
+                  )}
+
+                  {/* Reliability */}
+                  {reliability > 0 && (
+                    <Badge variant="outline" className={`text-xs ${reliabilityColor}`}>
+                      <ShieldCheck className="w-3 h-3 mr-1" />
+                      {reliabilityLabel}
                     </Badge>
                   )}
 

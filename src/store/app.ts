@@ -11,6 +11,9 @@ import { EVVehicle } from '@/lib/data/vehicles';
 // Charging speed filter options
 export type SpeedFilter = 'all' | 'dc_fast' | 'level2';
 
+// Sort options
+export type SortOption = 'distance' | 'wait_time' | 'price' | 'power';
+
 interface AppState {
   // User
   user: User | null;
@@ -54,6 +57,10 @@ interface AppState {
   // Vehicle profile
   selectedVehicle: EVVehicle | null;
   setSelectedVehicle: (vehicle: EVVehicle | null) => void;
+
+  // Sort
+  sortBy: SortOption;
+  setSortBy: (sort: SortOption) => void;
 
   // Search
   searchQuery: string;
@@ -120,6 +127,10 @@ export const useAppStore = create<AppState>()(
       selectedVehicle: null,
       setSelectedVehicle: (vehicle) => set({ selectedVehicle: vehicle }),
 
+      // Sort
+      sortBy: 'distance' as SortOption,
+      setSortBy: (sort) => set({ sortBy: sort }),
+
       // Search
       searchQuery: '',
       setSearchQuery: (query) => set({ searchQuery: query }),
@@ -138,6 +149,7 @@ export const useAppStore = create<AppState>()(
         speedFilter: state.speedFilter,
         favorites: state.favorites,
         selectedVehicle: state.selectedVehicle,
+        sortBy: state.sortBy,
       }),
     }
   )

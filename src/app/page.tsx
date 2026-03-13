@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Toaster } from '@/components/ui/sonner';
 import { Zap, RefreshCw, Search, MapPin, HelpCircle, CheckCircle, Car } from 'lucide-react';
-import { SpeedFilter } from '@/store/app';
+import { SpeedFilter, SortOption } from '@/store/app';
 import { EV_VEHICLES } from '@/lib/data/vehicles';
 
 export default function HomePage() {
@@ -51,6 +51,8 @@ export default function HomePage() {
     setShowAvailableOnly,
     selectedVehicle,
     setSelectedVehicle,
+    sortBy,
+    setSortBy,
   } = useAppStore();
 
   // Initialize device on mount
@@ -238,6 +240,16 @@ export default function HomePage() {
             <option value="all">All Speeds</option>
             <option value="dc_fast">DC Fast (50+ kW)</option>
             <option value="level2">Level 2 (7-49 kW)</option>
+          </select>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            className="px-3 py-2 border rounded-md bg-background text-sm flex-1 h-10 cursor-pointer hover:border-emerald-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
+          >
+            <option value="distance">Sort: Distance</option>
+            <option value="wait_time">Sort: Wait Time</option>
+            <option value="price">Sort: Price</option>
+            <option value="power">Sort: Power</option>
           </select>
           <button
             onClick={() => setShowAvailableOnly(!showAvailableOnly)}
