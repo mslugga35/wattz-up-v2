@@ -97,35 +97,45 @@ export async function POST(request: NextRequest) {
     const debugErrors: string[] = [];
 
     for (const state of states) {
-      const url = new URL(`${AFDC_API_BASE}.json`);
-      url.searchParams.set('api_key', apiKey);
-      url.searchParams.set('fuel_type', 'ELEC');
-      url.searchParams.set('status', 'E');
-      url.searchParams.set('state', state);
-      url.searchParams.set('limit', '10000');
+      // AFDC API max limit is 200 — paginate with offset
+      let offset = 0;
+      const PAGE_LIMIT = 200;
 
-      let response: Response;
-      try {
-        response = await fetch(url.toString());
-      } catch (fetchErr) {
-        const msg = `Fetch failed for ${state}: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`;
-        console.error(msg);
-        debugErrors.push(msg);
-        continue;
+      while (true) {
+        const url = new URL(`${AFDC_API_BASE}.json`);
+        url.searchParams.set('api_key', apiKey);
+        url.searchParams.set('fuel_type', 'ELEC');
+        url.searchParams.set('status', 'E');
+        url.searchParams.set('state', state);
+        url.searchParams.set('limit', String(PAGE_LIMIT));
+        url.searchParams.set('offset', String(offset));
+
+        let response: Response;
+        try {
+          response = await fetch(url.toString());
+        } catch (fetchErr) {
+          const msg = `Fetch failed for ${state}: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`;
+          console.error(msg);
+          debugErrors.push(msg);
+          break;
+        }
+
+        if (!response.ok) {
+          const errText = await response.text().catch(() => '');
+          const msg = `AFDC ${state}: ${response.status} ${errText.slice(0, 200)}`;
+          console.error(msg);
+          debugErrors.push(msg);
+          break;
+        }
+
+        const data = await response.json();
+        const stations = data.fuel_stations || [];
+        allStations = allStations.concat(stations);
+
+        // If we got fewer than PAGE_LIMIT, we've reached the end
+        if (stations.length < PAGE_LIMIT) break;
+        offset += PAGE_LIMIT;
       }
-
-      if (!response.ok) {
-        const errText = await response.text().catch(() => '');
-        const msg = `AFDC ${state}: ${response.status} ${errText.slice(0, 200)}`;
-        console.error(msg);
-        debugErrors.push(msg);
-        continue;
-      }
-
-      const data = await response.json();
-      const stationCount = data.fuel_stations?.length ?? 0;
-      console.log(`State ${state}: ${stationCount} stations (total_results: ${data.total_results})`);
-      allStations = allStations.concat(data.fuel_stations || []);
     }
 
     let processed = 0;
