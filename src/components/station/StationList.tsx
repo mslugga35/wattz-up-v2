@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportDialog } from './ReportDialog';
+import { StationPhotos } from './StationPhotos';
 import {
   Zap,
   Clock,
@@ -301,6 +302,13 @@ export function StationList() {
                     </span>
                   )}
                 </div>
+
+                {/* Photos — show when station is selected */}
+                {isSelected && (
+                  <div className="mt-3 pt-3 border-t">
+                    <StationPhotos stationId={station.id} />
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col items-end gap-2 ml-2">
