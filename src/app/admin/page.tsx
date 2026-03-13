@@ -28,8 +28,11 @@ export default function AdminPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/stats');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // Pass admin token from URL query param (e.g., /admin?token=xxx)
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token') || '';
+      const res = await fetch(`/api/admin/stats?token=${encodeURIComponent(token)}`);
+      if (!res.ok) throw new Error(res.status === 401 ? 'Unauthorized — add ?token=YOUR_CRON_SECRET to URL' : `HTTP ${res.status}`);
       setStats(await res.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch');

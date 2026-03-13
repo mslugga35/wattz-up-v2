@@ -1,6 +1,7 @@
 /**
- * Shared cron authentication helper.
+ * Shared cron/admin authentication helper.
  * Verifies CRON_SECRET using timing-safe comparison.
+ * Both sides are SHA-256 hashed to normalize length and prevent timing leaks.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,18 +20,47 @@ export function verifyCronAuth(request: NextRequest): NextResponse | null {
   }
 
   const provided = authHeader.slice(7);
-  if (provided.length !== cronSecret.length) {
+
+  // Hash both sides to fixed length — eliminates timing side-channel from length check
+  const a = crypto.createHash('sha256').update(provided).digest();
+  const b = crypto.createHash('sha256').update(cronSecret).digest();
+
+  if (!crypto.timingSafeEqual(a, b)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const isValid = crypto.timingSafeEqual(
-    Buffer.from(provided),
-    Buffer.from(cronSecret)
-  );
+  return null;
+}
 
-  if (!isValid) {
+/**
+ * Verify admin access via Bearer header OR ?token= query param.
+ * Used by the admin dashboard which can't set headers from client-side fetch.
+ */
+export function verifyAdminAuth(request: NextRequest): NextResponse | null {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  return null; // Auth passed
+  // Try Bearer header first
+  const authHeader = request.headers.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    return verifyCronAuth(request);
+  }
+
+  // Fall back to ?token= query param
+  const { searchParams } = new URL(request.url);
+  const token = searchParams.get('token');
+  if (!token) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const a = crypto.createHash('sha256').update(token).digest();
+  const b = crypto.createHash('sha256').update(cronSecret).digest();
+
+  if (!crypto.timingSafeEqual(a, b)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  return null;
 }

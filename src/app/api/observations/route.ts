@@ -49,9 +49,10 @@ const submitSchema = z.object({
   stallsAvailable: z.number().int().min(0).max(100).nullish(),
 });
 
-// Hash device ID for privacy (use env-based salt)
+// Hash device ID for privacy — uses dedicated salt, separate from CRON_SECRET
 function hashDeviceId(deviceId: string): string {
-  const salt = process.env.CRON_SECRET || 'default-salt';
+  const salt = process.env.DEVICE_HASH_SALT || process.env.CRON_SECRET;
+  if (!salt) throw new Error('DEVICE_HASH_SALT not configured');
   return crypto.createHash('sha256').update(deviceId + salt).digest('hex').slice(0, 16);
 }
 

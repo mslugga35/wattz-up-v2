@@ -1,6 +1,5 @@
 -- WATTZ UP v2 - Database Schema
 -- All tables prefixed with wattz_ to avoid collisions on shared Supabase instance
--- Supabase project: ebhtzgimevacvcgiyesc
 
 -- Enable PostGIS extension
 CREATE EXTENSION IF NOT EXISTS postgis;

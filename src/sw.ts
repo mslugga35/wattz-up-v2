@@ -29,9 +29,9 @@ const serwist = new Serwist({
     ],
   },
   runtimeCaching: [
-    // API routes — network first, short cache for offline resilience
+    // Station API only — non-sensitive, public data. Never cache alerts/observations/users.
     {
-      matcher: /^\/api\//,
+      matcher: /^\/api\/stations\//,
       handler: new NetworkFirst({
         cacheName: "api-cache",
         plugins: [

@@ -145,6 +145,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Missing alert id' }, { status: 400 });
     }
 
+    // Validate UUID format to prevent injection
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(alertId)) {
+      return NextResponse.json({ error: 'Invalid alert id' }, { status: 400 });
+    }
+
     // Get user
     const { data: user } = await supabase
       .from('wattz_users')

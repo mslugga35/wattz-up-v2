@@ -4,10 +4,13 @@
  * alert summaries, and last ingest job info.
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db/client';
+import { verifyAdminAuth } from '@/lib/auth/verify-cron';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authError = verifyAdminAuth(request);
+  if (authError) return authError;
   try {
     // Run all queries in parallel
     const [stationsRes, obs24hRes, obs7dRes, obsByTypeRes, alertsRes, ingestRes] =

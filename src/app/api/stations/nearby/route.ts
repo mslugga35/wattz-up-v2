@@ -14,7 +14,7 @@ const querySchema = z.object({
   longitude: z.coerce.number().min(-180).max(180),
   radiusKm: z.coerce.number().min(1).max(100).default(10),
   network: z.string().nullish(),
-  plugTypes: z.string().nullish(),
+  plugTypes: z.string().max(100).nullish(),
   limit: z.coerce.number().min(1).max(100).default(20),
 });
 
