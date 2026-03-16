@@ -32,6 +32,7 @@ node --env-file=.env.local scripts/ocm-ingest.mjs     # OCM
 - 3 retries on 429 with 10s/20s/30s backoff
 - PM2 cron: `wattz-afdc-ingest` (#72) — daily 4 AM UTC (midnight ET)
 - **Gotcha:** AFDC rate limit is aggressive — if you get 429, wait hours before retrying
+- **Gotcha:** When rate limited, AFDC ignores state filter and returns ALL US stations — causes massive dupes (safe due to upsert dedup, but wastes time)
 
 ### OCM Ingest (`scripts/ocm-ingest.mjs`)
 - Grid tiling: continental US = 4°lat × 6°lng tiles + Alaska + Hawaii = 72 tiles
