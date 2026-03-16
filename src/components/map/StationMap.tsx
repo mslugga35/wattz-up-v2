@@ -17,7 +17,7 @@ import type { MapLayerMouseEvent, GeoJSONSource } from 'mapbox-gl';
 import { useAppStore } from '@/store/app';
 import { StationWithEstimate } from '@/types';
 import { Badge } from '@/components/ui/badge';
-import { Zap, Clock, Navigation, DollarSign, Gauge } from 'lucide-react';
+import { Zap, Clock, Navigation, DollarSign, Gauge, ExternalLink } from 'lucide-react';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 export function StationMap() {
@@ -31,6 +31,7 @@ export function StationMap() {
     setMapZoom,
     userLocation,
     setUserLocation,
+    useMiles,
   } = useAppStore();
 
   // Convert stations to GeoJSON for clustering
@@ -231,7 +232,9 @@ export function StationMap() {
                 {selectedStation.distance !== undefined && (
                   <Badge variant="outline" className="text-xs">
                     <Navigation className="w-3 h-3 mr-1" />
-                    {selectedStation.distance.toFixed(1)} km
+                    {useMiles
+                      ? `${(selectedStation.distance * 0.621).toFixed(1)} mi`
+                      : `${selectedStation.distance.toFixed(1)} km`}
                   </Badge>
                 )}
                 {selectedStation.pricingPerKwh && (
@@ -270,6 +273,16 @@ export function StationMap() {
               {selectedStation.address && (
                 <p className="text-xs text-gray-500 mt-2">{selectedStation.address}</p>
               )}
+
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${selectedStation.latitude},${selectedStation.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-500 font-medium mt-2"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Directions
+              </a>
             </div>
           </Popup>
         )}

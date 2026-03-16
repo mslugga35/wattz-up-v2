@@ -62,6 +62,10 @@ interface AppState {
   sortBy: SortOption;
   setSortBy: (sort: SortOption) => void;
 
+  // Units
+  useMiles: boolean;
+  setUseMiles: (useMiles: boolean) => void;
+
   // Search
   searchQuery: string;
   setSearchQuery: (query: string) => void;
@@ -131,6 +135,10 @@ export const useAppStore = create<AppState>()(
       sortBy: 'distance' as SortOption,
       setSortBy: (sort) => set({ sortBy: sort }),
 
+      // Units — default to miles for US users
+      useMiles: true,
+      setUseMiles: (useMiles) => set({ useMiles }),
+
       // Search
       searchQuery: '',
       setSearchQuery: (query) => set({ searchQuery: query }),
@@ -150,6 +158,7 @@ export const useAppStore = create<AppState>()(
         favorites: state.favorites,
         selectedVehicle: state.selectedVehicle,
         sortBy: state.sortBy,
+        useMiles: state.useMiles,
       }),
     }
   )

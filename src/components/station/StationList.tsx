@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   BatteryCharging,
   ShieldCheck,
+  ExternalLink,
 } from 'lucide-react';
 
 // Format power level for display
@@ -54,6 +55,7 @@ export function StationList() {
     toggleFavorite,
     selectedVehicle,
     sortBy,
+    useMiles,
   } = useAppStore();
 
   // Apply client-side filters
@@ -249,7 +251,9 @@ export function StationList() {
                   {station.distance !== undefined && (
                     <Badge variant="outline" className="text-xs">
                       <Navigation className="w-3 h-3 mr-1" />
-                      {station.distance.toFixed(1)} km
+                      {useMiles
+                        ? `${(station.distance * 0.621).toFixed(1)} mi`
+                        : `${station.distance.toFixed(1)} km`}
                     </Badge>
                   )}
 
@@ -303,9 +307,22 @@ export function StationList() {
                   )}
                 </div>
 
-                {/* Photos — show when station is selected */}
+                {/* Expanded details when selected */}
                 {isSelected && (
-                  <div className="mt-3 pt-3 border-t">
+                  <div className="mt-3 pt-3 border-t space-y-3">
+                    {station.address && (
+                      <p className="text-xs text-muted-foreground">{station.address}{station.city ? `, ${station.city}` : ''}{station.state ? `, ${station.state}` : ''} {station.zip || ''}</p>
+                    )}
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${station.latitude},${station.longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-500 font-medium"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      Get Directions
+                    </a>
                     <StationPhotos stationId={station.id} />
                   </div>
                 )}

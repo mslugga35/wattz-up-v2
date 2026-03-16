@@ -5,7 +5,7 @@
  * Map + Station list view
  */
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useAppStore } from '@/store/app';
 import { fetchNearbyStations, registerDevice } from '@/lib/api';
@@ -53,6 +53,8 @@ export default function HomePage() {
     setSelectedVehicle,
     sortBy,
     setSortBy,
+    useMiles,
+    setUseMiles,
   } = useAppStore();
 
   // Initialize device on mount
@@ -97,11 +99,11 @@ export default function HomePage() {
     }
   }, [setUserLocation]);
 
-  // Fetch stations when location changes
-  const fetchStations = useCallback(async () => {
-    // Use map center for searching (what user is looking at)
-    const location = mapCenter;
+  // Debounced fetch — waits 500ms after map stops moving
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const fetchStations = useCallback(async () => {
+    const location = mapCenter;
     setIsLoading(true);
     try {
       const result = await fetchNearbyStations(location.latitude, location.longitude, {
@@ -118,10 +120,25 @@ export default function HomePage() {
     }
   }, [mapCenter, radiusKm, networkFilter, plugTypeFilter, setStations, setIsLoading]);
 
-  // Fetch on map center, radius, or filter change
+  // Debounce map center changes (500ms), instant on filter changes
+  const prevFiltersRef = useRef({ radiusKm, networkFilter, plugTypeFilter: plugTypeFilter.join(',') });
   useEffect(() => {
-    fetchStations();
-  }, [fetchStations]);
+    const filtersChanged =
+      prevFiltersRef.current.radiusKm !== radiusKm ||
+      prevFiltersRef.current.networkFilter !== networkFilter ||
+      prevFiltersRef.current.plugTypeFilter !== plugTypeFilter.join(',');
+    prevFiltersRef.current = { radiusKm, networkFilter, plugTypeFilter: plugTypeFilter.join(',') };
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (filtersChanged) {
+      fetchStations();
+    } else {
+      debounceRef.current = setTimeout(fetchStations, 500);
+    }
+
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [fetchStations, radiusKm, networkFilter, plugTypeFilter]);
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -176,11 +193,31 @@ export default function HomePage() {
             onChange={(e) => setRadiusKm(Number(e.target.value))}
             className="px-3 py-2 border rounded-md bg-background text-sm h-10 appearance-none cursor-pointer hover:border-emerald-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
           >
-            <option value={5}>5 km</option>
-            <option value={10}>10 km</option>
-            <option value={25}>25 km</option>
-            <option value={50}>50 km</option>
+            {useMiles ? (
+              <>
+                <option value={5}>3 mi</option>
+                <option value={10}>6 mi</option>
+                <option value={25}>15 mi</option>
+                <option value={50}>30 mi</option>
+                <option value={100}>60 mi</option>
+              </>
+            ) : (
+              <>
+                <option value={5}>5 km</option>
+                <option value={10}>10 km</option>
+                <option value={25}>25 km</option>
+                <option value={50}>50 km</option>
+                <option value={100}>100 km</option>
+              </>
+            )}
           </select>
+          <button
+            onClick={() => setUseMiles(!useMiles)}
+            className="px-3 py-2 border rounded-md bg-background text-sm h-10 cursor-pointer hover:border-emerald-400 transition-colors font-medium min-w-[40px]"
+            title={useMiles ? 'Switch to kilometers' : 'Switch to miles'}
+          >
+            {useMiles ? 'mi' : 'km'}
+          </button>
         </div>
         {/* Vehicle selector */}
         <div className="flex gap-2">
@@ -205,7 +242,7 @@ export default function HomePage() {
           {selectedVehicle && (
             <Badge variant="outline" className="h-10 px-3 flex items-center gap-1 text-xs whitespace-nowrap">
               <Zap className="w-3 h-3" />
-              {selectedVehicle.rangeKm} km range
+              {useMiles ? Math.round(selectedVehicle.rangeKm * 0.621) : selectedVehicle.rangeKm} {useMiles ? 'mi' : 'km'} range
             </Badge>
           )}
         </div>
