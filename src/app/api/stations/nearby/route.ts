@@ -15,7 +15,7 @@ const querySchema = z.object({
   radiusKm: z.coerce.number().min(1).max(100).default(10),
   network: z.string().nullish(),
   plugTypes: z.string().max(100).nullish(),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(500).default(50),
 });
 
 export async function GET(request: NextRequest) {

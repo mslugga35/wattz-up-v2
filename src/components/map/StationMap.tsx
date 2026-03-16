@@ -2,11 +2,18 @@
 
 /**
  * WATTZ UP v2 - Station Map Component
- * Mapbox GL JS map with station markers
+ * Mapbox GL JS map with clustered station markers
  */
 
-import { useCallback } from 'react';
-import Map, { Marker, Popup, NavigationControl, GeolocateControl } from 'react-map-gl/mapbox';
+import { useCallback, useMemo } from 'react';
+import Map, {
+  Source,
+  Layer,
+  Popup,
+  NavigationControl,
+  GeolocateControl,
+} from 'react-map-gl/mapbox';
+import type { MapLayerMouseEvent, GeoJSONSource } from 'mapbox-gl';
 import { useAppStore } from '@/store/app';
 import { StationWithEstimate } from '@/types';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +21,6 @@ import { Zap, Clock, Navigation, DollarSign, Gauge } from 'lucide-react';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 export function StationMap() {
-
   const {
     stations,
     selectedStation,
@@ -26,6 +32,27 @@ export function StationMap() {
     userLocation,
     setUserLocation,
   } = useAppStore();
+
+  // Convert stations to GeoJSON for clustering
+  const geojson = useMemo(() => ({
+    type: 'FeatureCollection' as const,
+    features: stations.map((s) => ({
+      type: 'Feature' as const,
+      id: s.id,
+      geometry: {
+        type: 'Point' as const,
+        coordinates: [s.longitude, s.latitude],
+      },
+      properties: {
+        id: s.id,
+        name: s.name,
+        network: s.network || 'Unknown',
+        maxPowerKw: s.maxPowerKw || 0,
+        stallsTotal: s.stallsTotal || 0,
+        waitMinutes: s.estimate?.etaWaitMinutes ?? -1,
+      },
+    })),
+  }), [stations]);
 
   // Handle map move
   const onMove = useCallback(
@@ -39,19 +66,35 @@ export function StationMap() {
     [setMapCenter, setMapZoom]
   );
 
-  // Handle marker click
-  const handleMarkerClick = (station: StationWithEstimate) => {
-    setSelectedStation(station);
-  };
+  // Handle click on cluster or station point
+  const onClick = useCallback(
+    (evt: MapLayerMouseEvent) => {
+      const feature = evt.features?.[0];
+      if (!feature) return;
 
-  // Get marker color based on wait time
-  const getMarkerColor = (station: StationWithEstimate): string => {
-    const waitMinutes = station.estimate?.etaWaitMinutes;
-    if (waitMinutes === null || waitMinutes === undefined) return '#6B7280'; // gray
-    if (waitMinutes <= 5) return '#10B981'; // green
-    if (waitMinutes <= 15) return '#F59E0B'; // yellow
-    return '#EF4444'; // red
-  };
+      // Click on cluster → zoom in
+      if (feature.layer?.id === 'clusters') {
+        const map = evt.target;
+        const source = map.getSource('stations') as GeoJSONSource;
+        if (source && feature.properties?.cluster_id) {
+          source.getClusterExpansionZoom(feature.properties.cluster_id, (err: any, zoom: number | null | undefined) => {
+            if (err || zoom == null) return;
+            const coords = (feature.geometry as any).coordinates;
+            map.easeTo({ center: coords, zoom: Math.min(zoom, 18) });
+          });
+        }
+        return;
+      }
+
+      // Click on individual station
+      if (feature.layer?.id === 'unclustered-point') {
+        const stationId = feature.properties?.id;
+        const station = stations.find((s) => s.id === stationId);
+        if (station) setSelectedStation(station);
+      }
+    },
+    [stations, setSelectedStation]
+  );
 
   return (
     <div className="relative w-full h-full min-h-[400px]">
@@ -63,10 +106,12 @@ export function StationMap() {
           zoom: mapZoom,
         }}
         onMove={onMove}
+        onClick={onClick}
+        interactiveLayerIds={['clusters', 'unclustered-point']}
         style={{ width: '100%', height: '100%' }}
         mapStyle="mapbox://styles/mapbox/dark-v11"
+        cursor="pointer"
       >
-        {/* Navigation controls */}
         <NavigationControl position="top-right" />
         <GeolocateControl
           position="top-right"
@@ -79,35 +124,80 @@ export function StationMap() {
           }}
         />
 
-        {/* Station markers */}
-        {stations.map((station) => (
-          <Marker
-            key={station.id}
-            latitude={station.latitude}
-            longitude={station.longitude}
-            onClick={(e) => {
-              e.originalEvent.stopPropagation();
-              handleMarkerClick(station);
+        <Source
+          id="stations"
+          type="geojson"
+          data={geojson}
+          cluster
+          clusterMaxZoom={14}
+          clusterRadius={50}
+        >
+          {/* Cluster circles */}
+          <Layer
+            id="clusters"
+            type="circle"
+            filter={['has', 'point_count']}
+            paint={{
+              'circle-color': [
+                'step',
+                ['get', 'point_count'],
+                '#10B981', // green for small clusters
+                10, '#F59E0B', // amber for medium
+                50, '#EF4444', // red for large
+              ],
+              'circle-radius': [
+                'step',
+                ['get', 'point_count'],
+                18,
+                10, 24,
+                50, 32,
+                100, 40,
+              ],
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#ffffff',
+              'circle-opacity': 0.9,
             }}
-          >
-            <div
-              className="cursor-pointer transform hover:scale-110 transition-transform"
-              style={{
-                width: 32,
-                height: 32,
-                backgroundColor: getMarkerColor(station),
-                borderRadius: '50%',
-                border: '3px solid white',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Zap className="w-4 h-4 text-white" />
-            </div>
-          </Marker>
-        ))}
+          />
+
+          {/* Cluster count labels */}
+          <Layer
+            id="cluster-count"
+            type="symbol"
+            filter={['has', 'point_count']}
+            layout={{
+              'text-field': '{point_count_abbreviated}',
+              'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
+              'text-size': 13,
+            }}
+            paint={{
+              'text-color': '#ffffff',
+            }}
+          />
+
+          {/* Individual station markers */}
+          <Layer
+            id="unclustered-point"
+            type="circle"
+            filter={['!', ['has', 'point_count']]}
+            paint={{
+              'circle-color': [
+                'case',
+                ['<=', ['get', 'waitMinutes'], 5], '#10B981',
+                ['<=', ['get', 'waitMinutes'], 15], '#F59E0B',
+                ['>', ['get', 'waitMinutes'], 15], '#EF4444',
+                '#6B7280', // gray for unknown (-1)
+              ],
+              'circle-radius': [
+                'interpolate', ['linear'], ['zoom'],
+                8, 4,
+                12, 8,
+                16, 12,
+              ],
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#ffffff',
+            }}
+          />
+        </Source>
 
         {/* Selected station popup */}
         {selectedStation && (

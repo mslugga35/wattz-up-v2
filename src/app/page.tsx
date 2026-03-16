@@ -108,7 +108,7 @@ export default function HomePage() {
         radiusKm,
         network: networkFilter || undefined,
         plugTypes: plugTypeFilter.length > 0 ? plugTypeFilter : undefined,
-        limit: 50,
+        limit: 200,
       });
       setStations(result.stations);
     } catch (error) {
